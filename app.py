@@ -7,19 +7,19 @@ import time
 import json
 import string
 import random
+import uuid
 import requests
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from datetime import timedelta
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, make_response
 from flask_socketio import SocketIO, emit, join_room
 
 # INIT
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_ultimate_v16_secret_key_persistent")
-# SESSION CONFIG - PENTING untuk Railway HTTPS!
-app.config['SESSION_COOKIE_SECURE'] = True      # Required for HTTPS
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_ultimate_v17_secret_key_persistent")
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_PERMANENT'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 30  # 30 hari
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
@@ -28,7 +28,9 @@ API_BASE = "https://hero-sms.com/stubs/handler_api.php"
 MASTER_PASS = str(os.environ.get("ACCESS_PASSWORD", "admin123")).strip()
 ADMIN_SECRET = str(os.environ.get("ADMIN_SECRET", "panel8899")).strip()
 
-print(f"\n[BOOT] HERO-SMS WEB V17 (SESSION FIX + SINGLE-USE) ONLINE")
+COOKIE_MAX_AGE = 86400 * 30  # 30 hari dalam detik
+
+print(f"\n[BOOT] HERO-SMS WEB V18 (PERSISTENT LOGIN) ONLINE")
 print(f"[BOOT] Admin Panel: /admin/{ADMIN_SECRET}")
 sys.stdout.flush()
 
@@ -42,7 +44,6 @@ COUNTRIES = {
 
 autobuy_active = {}
 
-# Connection pooling
 http_session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)
 http_session.mount('https://', adapter)
@@ -72,15 +73,35 @@ def api_req(key, action, **kwargs):
         print(f"[API_ERR] {action}: {e}")
         return "ERR_HTTP"
 
+def is_authenticated():
+    """Cek apakah user authenticated via session ATAU persistent cookie."""
+    # 1. Cek Flask session dulu
+    if session.get('authenticated'):
+        return True
+    
+    # 2. Cek persistent cookie (untuk kasus browser ditutup lalu dibuka lagi)
+    auth_token = request.cookies.get('hero_token')
+    hero_code = request.cookies.get('hero_code')
+    
+    if auth_token and hero_code and hero_code in access_codes:
+        stored_token = access_codes[hero_code].get('auth_token')
+        if stored_token and stored_token == auth_token:
+            # Cookie valid! Restore session
+            session.permanent = True
+            session['authenticated'] = True
+            session['access_code'] = hero_code
+            print(f"[AUTH] ✅ Auto-login via persistent cookie: {hero_code}")
+            sys.stdout.flush()
+            return True
+    
+    return False
+
 # =============================================
-# LOGIN VIA HTTP - SESSION PERSISTENT!
+# ROUTES
 # =============================================
 @app.route('/')
 def home():
-    # Cek session - jika sudah authenticated, langsung masuk dashboard
-    if session.get('authenticated'):
-        print(f"[HOME] User authenticated via session cookie (code: {session.get('access_code', '?')})")
-        sys.stdout.flush()
+    if is_authenticated():
         return render_template('index.html', countries=COUNTRIES, logged_in=True)
     return render_template('index.html', countries=COUNTRIES, logged_in=False)
 
@@ -90,7 +111,7 @@ def login():
     code = request.form.get('code', '').strip().upper()
     
     print(f"[AUTH] Login attempt: '{code}'")
-    print(f"[AUTH] Codes in memory: {len(access_codes)} | Keys: {list(access_codes.keys())}")
+    print(f"[AUTH] Codes in memory: {len(access_codes)}")
     sys.stdout.flush()
     
     if code not in access_codes:
@@ -101,33 +122,61 @@ def login():
     code_info = access_codes[code]
     
     if code_info['status'] == 'available':
-        # Kode baru - PERTAMA KALI DIPAKAI
+        # === KODE BARU - PERTAMA KALI DIPAKAI ===
+        auth_token = str(uuid.uuid4())
         access_codes[code]['status'] = 'used'
         access_codes[code]['used_at'] = time.time()
         access_codes[code]['used_str'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        access_codes[code]['auth_token'] = auth_token  # token unik per browser
         
-        # Set session PERMANENT agar survive refresh
         session.permanent = True
         session['authenticated'] = True
         session['access_code'] = code
-        session['login_time'] = time.time()
         
-        print(f"[AUTH] ✅ Code {code} PERTAMA KALI DIPAKAI - BERHASIL!")
+        # Buat response dengan PERSISTENT COOKIE (survive browser close!)
+        resp = make_response(jsonify({'success': True}))
+        resp.set_cookie('hero_token', auth_token, max_age=COOKIE_MAX_AGE, secure=True, httponly=True, samesite='Lax')
+        resp.set_cookie('hero_code', code, max_age=COOKIE_MAX_AGE, secure=True, httponly=True, samesite='Lax')
+        
+        print(f"[AUTH] ✅ Code {code} PERTAMA KALI - token: {auth_token[:8]}...")
         sys.stdout.flush()
-        return jsonify({'success': True})
+        return resp
     
     elif code_info['status'] == 'used':
-        # Kode SUDAH TERPAKAI - TOLAK! (sekali pakai)
-        print(f"[AUTH] ❌ Code {code} SUDAH TERPAKAI oleh orang lain!")
-        sys.stdout.flush()
-        return jsonify({'success': False, 'error': 'Kode sudah dipakai! Minta kode baru ke admin.'})
+        # === KODE SUDAH TERPAKAI ===
+        # Cek apakah browser ini yang punya kode (via persistent cookie)
+        browser_token = request.cookies.get('hero_token')
+        stored_token = code_info.get('auth_token')
+        
+        if browser_token and stored_token and browser_token == stored_token:
+            # Browser yang SAMA - izinkan re-login
+            session.permanent = True
+            session['authenticated'] = True
+            session['access_code'] = code
+            
+            resp = make_response(jsonify({'success': True}))
+            # Refresh cookies
+            resp.set_cookie('hero_token', stored_token, max_age=COOKIE_MAX_AGE, secure=True, httponly=True, samesite='Lax')
+            resp.set_cookie('hero_code', code, max_age=COOKIE_MAX_AGE, secure=True, httponly=True, samesite='Lax')
+            
+            print(f"[AUTH] ✅ Code {code} RE-LOGIN (same browser) OK!")
+            sys.stdout.flush()
+            return resp
+        else:
+            # Browser BERBEDA - TOLAK!
+            print(f"[AUTH] ❌ Code {code} DITOLAK - browser berbeda!")
+            sys.stdout.flush()
+            return jsonify({'success': False, 'error': 'Kode sudah dipakai di browser lain! Minta kode baru.'})
     
     return jsonify({'success': False, 'error': 'Kode tidak valid'})
 
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect('/')
+    resp = make_response(redirect('/'))
+    resp.delete_cookie('hero_token')
+    resp.delete_cookie('hero_code')
+    return resp
 
 # =============================================
 # ADMIN
@@ -148,7 +197,11 @@ def admin_list_codes():
     pw = request.args.get('pw', '')
     if pw != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
-    return jsonify(access_codes)
+    # Return tanpa auth_token (security)
+    safe_codes = {}
+    for code, info in access_codes.items():
+        safe_codes[code] = {k: v for k, v in info.items() if k != 'auth_token'}
+    return jsonify(safe_codes)
 
 @app.route(f'/api/admin/{ADMIN_SECRET}/generate', methods=['POST'])
 def admin_generate():
@@ -188,7 +241,6 @@ def admin_delete():
 
 @app.route(f'/api/admin/{ADMIN_SECRET}/reset', methods=['POST'])
 def admin_reset_code():
-    """Reset kode yang sudah terpakai jadi available lagi"""
     global access_codes
     data = request.get_json()
     if not data or data.get('password') != MASTER_PASS:
@@ -196,39 +248,27 @@ def admin_reset_code():
     code = data.get('code')
     if code in access_codes:
         access_codes[code]['status'] = 'available'
-        if 'used_at' in access_codes[code]:
-            del access_codes[code]['used_at']
-        if 'used_str' in access_codes[code]:
-            del access_codes[code]['used_str']
+        access_codes[code].pop('used_at', None)
+        access_codes[code].pop('used_str', None)
+        access_codes[code].pop('auth_token', None)
         return jsonify({'success': True})
     return jsonify({'error': 'not found'}), 404
 
-# =============================================
-# DEBUG
-# =============================================
 @app.route(f'/api/admin/{ADMIN_SECRET}/debug', methods=['GET'])
 def admin_debug():
     pw = request.args.get('pw', '')
     if pw != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
-    
     available = sum(1 for c in access_codes.values() if c.get('status') == 'available')
     used = sum(1 for c in access_codes.values() if c.get('status') == 'used')
-    
     return jsonify({
-        'version': 'V17',
-        'storage': 'IN_MEMORY',
+        'version': 'V18',
         'total_codes': len(access_codes),
         'available': available,
         'used': used,
-        'codes_detail': {k: v.get('status') for k, v in access_codes.items()},
+        'codes_status': {k: v.get('status') for k, v in access_codes.items()},
         'server_time': time.strftime('%Y-%m-%d %H:%M:%S'),
         'pid': os.getpid(),
-        'session_config': {
-            'cookie_secure': app.config.get('SESSION_COOKIE_SECURE'),
-            'cookie_samesite': app.config.get('SESSION_COOKIE_SAMESITE'),
-            'permanent_lifetime': app.config.get('PERMANENT_SESSION_LIFETIME'),
-        }
     })
 
 # =============================================

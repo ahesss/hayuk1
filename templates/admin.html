@@ -58,26 +58,26 @@
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
         <h1 style="margin-bottom:8px;">🔐 Admin Panel</h1>
-        <p style="margin-bottom:24px; color:var(--text-dim)">HeroSMS V17 — Code Manager</p>
+        <p style="margin-bottom:24px; color:var(--text-dim)">HeroSMS V18</p>
         <input type="password" id="adminPass" placeholder="Password Admin">
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:13px; color:var(--text-dim); cursor:pointer;">
+            <input type="checkbox" id="rememberPw" checked style="width:auto; margin:0;"> Ingat password
+        </label>
         <button class="btn btn-primary" style="width:100%" onclick="adminLogin()">Masuk</button>
     </div>
 </div>
 
 <div id="adminApp" class="container hidden">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:8px;">
-        <h1 style="font-size:22px;">🔐 Admin V17</h1>
+        <h1 style="font-size:22px;">🔐 Admin V18</h1>
         <div style="display:flex; gap:8px; align-items:center;">
-            <span id="syncStatus" class="sync-indicator sync-loading">⏳ Loading...</span>
+            <span id="syncStatus" class="sync-indicator sync-loading">⏳</span>
             <button class="btn btn-danger btn-sm" onclick="location.href='/'">← Kembali</button>
         </div>
     </div>
 
     <div class="info-box">
-        💡 <b>V17 — Kode Sekali Pakai</b><br>
-        • Setiap kode hanya bisa dipakai <b>1x di 1 browser</b><br>
-        • User yang sudah login bisa refresh tanpa masalah<br>
-        • Klik 🔄 Reset untuk mengaktifkan ulang kode yang sudah terpakai
+        💡 <b>Kode Sekali Pakai</b> — 1 kode = 1 browser. User bisa tutup & buka browser tanpa login ulang. Klik 🔄 untuk reset kode.
     </div>
 
     <div class="stats-row">
@@ -125,8 +125,34 @@
     let allCodes = {};
     let lastNewCodes = [];
 
+    // ===== AUTO-LOGIN: cek password tersimpan =====
+    (function autoLogin() {
+        const saved = localStorage.getItem('admin_pw');
+        if (saved) {
+            document.getElementById('adminPass').value = saved;
+            // Auto-verify
+            adminPw = saved;
+            fetch(API_BASE + '/verify', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password: saved})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    document.getElementById('loginScreen').classList.add('hidden');
+                    document.getElementById('adminApp').classList.remove('hidden');
+                    refreshCodes();
+                }
+            })
+            .catch(() => {});
+        }
+    })();
+
     function adminLogin() {
         adminPw = document.getElementById('adminPass').value;
+        const remember = document.getElementById('rememberPw').checked;
+        
         fetch(API_BASE + '/verify', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -135,6 +161,9 @@
         .then(r => r.json())
         .then(d => {
             if (d.success) {
+                if (remember) {
+                    localStorage.setItem('admin_pw', adminPw);
+                }
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('adminApp').classList.remove('hidden');
                 refreshCodes();
@@ -154,83 +183,57 @@
     }
 
     function refreshCodes() {
-        setSyncStatus('loading', '⏳ Memuat...');
+        setSyncStatus('loading', '⏳');
         fetch(API_BASE + '/codes?pw=' + encodeURIComponent(adminPw))
-        .then(r => {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-        })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(codes => {
             allCodes = codes;
             renderCodes(codes);
-            setSyncStatus('ok', '✅ OK (' + Object.keys(codes).length + ')');
+            setSyncStatus('ok', '✅ ' + Object.keys(codes).length);
         })
-        .catch(e => setSyncStatus('error', '❌ ' + e.message));
+        .catch(e => setSyncStatus('error', '❌'));
     }
 
     function renderCodes(codes) {
         const list = document.getElementById('codesList');
         const entries = Object.entries(codes).sort((a, b) => (b[1].created || 0) - (a[1].created || 0));
         
-        let totalCount = entries.length;
-        let availCount = entries.filter(([k, v]) => v.status === 'available').length;
-        let usedCount = entries.filter(([k, v]) => v.status === 'used').length;
-        
-        document.getElementById('statTotal').innerText = totalCount;
-        document.getElementById('statAvail').innerText = availCount;
-        document.getElementById('statUsed').innerText = usedCount;
+        document.getElementById('statTotal').innerText = entries.length;
+        document.getElementById('statAvail').innerText = entries.filter(([k, v]) => v.status === 'available').length;
+        document.getElementById('statUsed').innerText = entries.filter(([k, v]) => v.status === 'used').length;
 
-        if (entries.length === 0) {
+        if (!entries.length) {
             list.innerHTML = '<p style="color:var(--text-dim); text-align:center; padding:20px;">Belum ada kode. Generate dulu!</p>';
             return;
         }
 
         list.innerHTML = entries.map(([code, info]) => {
             const isAvail = info.status === 'available';
-            const statusBadge = isAvail
-                ? '<span class="badge badge-green">✅ Tersedia</span>'
-                : '<span class="badge badge-red">🔒 Terpakai</span>';
-            const timeInfo = isAvail
-                ? `<span style="font-size:11px; color:var(--text-dim);">Dibuat: ${info.created_str || '-'}</span>`
-                : `<span style="font-size:11px; color:var(--text-dim);">Dipakai: ${info.used_str || '-'}</span>`;
-            
-            const resetBtn = !isAvail 
-                ? `<button class="btn btn-cyan btn-sm" style="margin-right:6px;" onclick="resetCode('${code}')">🔄</button>` 
-                : '';
-            
-            return `
-                <div class="code-item">
-                    <div>
-                        <span class="code-text ${isAvail ? 'code-available' : 'code-used'}" onclick="copyCode('${code}')">${code}</span>
-                        <div style="margin-top:4px;">${statusBadge} ${timeInfo}</div>
-                    </div>
-                    <div style="display:flex; gap:4px;">
-                        ${resetBtn}
-                        <button class="btn btn-danger btn-sm" onclick="deleteCode('${code}')">🗑️</button>
-                    </div>
+            const badge = isAvail ? '<span class="badge badge-green">✅ Tersedia</span>' : '<span class="badge badge-red">🔒 Terpakai</span>';
+            const timeStr = isAvail ? `Dibuat: ${info.created_str||'-'}` : `Dipakai: ${info.used_str||'-'}`;
+            const resetBtn = !isAvail ? `<button class="btn btn-cyan btn-sm" style="margin-right:4px;" onclick="resetCode('${code}')" title="Reset jadi tersedia">🔄</button>` : '';
+            return `<div class="code-item">
+                <div>
+                    <span class="code-text ${isAvail?'code-available':'code-used'}" onclick="copyCode('${code}')">${code}</span>
+                    <div style="margin-top:4px;">${badge} <span style="font-size:11px;color:var(--text-dim);">${timeStr}</span></div>
                 </div>
-            `;
+                <div style="display:flex;">${resetBtn}<button class="btn btn-danger btn-sm" onclick="deleteCode('${code}')">🗑️</button></div>
+            </div>`;
         }).join('');
     }
 
     function generateCodes() {
         const count = document.getElementById('codeCount').value;
         const btn = document.getElementById('btnGenerate');
-        btn.disabled = true;
-        btn.innerText = '⏳ ...';
-        
-        fetch(API_BASE + '/generate', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({password: adminPw, count: parseInt(count)})
-        })
+        btn.disabled = true; btn.innerText = '⏳ ...';
+        fetch(API_BASE + '/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: adminPw, count: parseInt(count)}) })
         .then(r => r.json())
         .then(d => {
             if (d.codes) {
                 lastNewCodes = d.codes;
                 document.getElementById('newCodes').classList.remove('hidden');
                 document.getElementById('newCodesList').innerText = d.codes.join('\n');
-                toast(`🎫 ${d.codes.length} kode dibuat!`);
+                toast('🎫 ' + d.codes.length + ' kode dibuat!');
                 refreshCodes();
             }
         })
@@ -239,48 +242,21 @@
     }
 
     function deleteCode(code) {
-        if (!confirm(`Hapus kode ${code}?`)) return;
-        fetch(API_BASE + '/delete', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({password: adminPw, code: code})
-        })
-        .then(r => r.json())
-        .then(d => { if (d.success) { toast('🗑️ Dihapus!'); refreshCodes(); } });
+        if (!confirm('Hapus ' + code + '?')) return;
+        fetch(API_BASE + '/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: adminPw, code: code}) })
+        .then(r => r.json()).then(d => { if (d.success) { toast('🗑️ Dihapus!'); refreshCodes(); } });
     }
 
     function resetCode(code) {
-        if (!confirm(`Reset kode ${code} jadi tersedia lagi?`)) return;
-        fetch(API_BASE + '/reset', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({password: adminPw, code: code})
-        })
-        .then(r => r.json())
-        .then(d => { if (d.success) { toast('🔄 Kode di-reset!'); refreshCodes(); } });
+        fetch(API_BASE + '/reset', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: adminPw, code: code}) })
+        .then(r => r.json()).then(d => { if (d.success) { toast('🔄 Reset!'); refreshCodes(); } });
     }
 
-    function copyCode(code) {
-        navigator.clipboard.writeText(code);
-        toast('📋 Copied: ' + code);
-    }
+    function copyCode(c) { navigator.clipboard.writeText(c); toast('📋 ' + c); }
+    function copyAllNew() { navigator.clipboard.writeText(lastNewCodes.join('\n')); toast('📋 ' + lastNewCodes.length + ' kode!'); }
+    function toast(m) { const x = document.createElement('div'); x.className='toast'; x.innerText=m; document.getElementById('tBox').appendChild(x); setTimeout(()=>x.remove(),3000); }
 
-    function copyAllNew() {
-        navigator.clipboard.writeText(lastNewCodes.join('\n'));
-        toast('📋 ' + lastNewCodes.length + ' kode di-copy!');
-    }
-
-    function toast(m) {
-        const x = document.createElement('div');
-        x.className = 'toast';
-        x.innerText = m;
-        document.getElementById('tBox').appendChild(x);
-        setTimeout(() => x.remove(), 3000);
-    }
-
-    setInterval(() => {
-        if (!document.getElementById('adminApp').classList.contains('hidden')) refreshCodes();
-    }, 10000);
+    setInterval(() => { if (!document.getElementById('adminApp').classList.contains('hidden')) refreshCodes(); }, 10000);
 </script>
 </body>
 </html>

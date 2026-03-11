@@ -96,7 +96,7 @@ def handle_bal():
 
 def otp_loop(sid, key, aid, st):
     while sid in user_sessions:
-        if (time.time() - st) > 120:
+        if (time.time() - st) > 1200:
             api_req(key, 'setStatus', status='8', id=aid)
             socketio.emit('order_update', {'id': aid, 'status': 'timeout'}, room=sid)
             break

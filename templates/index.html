@@ -252,14 +252,32 @@
         g.appendChild(d);
     });
 
-    function login() { socket.emit('login', {password: document.getElementById('passInput').value}); }
+
+    // AUTO LOGIN
+    window.onload = () => {
+        const p = localStorage.getItem('herosms_pass');
+        if(p) {
+            document.getElementById('passInput').value = p;
+            setTimeout(login, 500);
+        }
+    };
+
+    function login() { 
+        const p = document.getElementById('passInput').value;
+        socket.emit('login', {password: p}); 
+    }
     socket.on('login_result', d => {
         if(d.success) {
+            const p = document.getElementById('passInput').value;
+            localStorage.setItem('herosms_pass', p);
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             const k = localStorage.getItem('api_key');
             if(k) { document.getElementById('apiInput').value=k; setKey(); }
-        } else toast('❌ Pass Salah! Buka Logs Railway.', 'red');
+        } else {
+            toast('❌ Pass Salah!', 'red');
+            localStorage.removeItem('herosms_pass');
+        }
     });
 
     function setKey() {

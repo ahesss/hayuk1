@@ -228,6 +228,50 @@
     let timers = {};
     let counts = {t:0, o:0, w:0};
 
+    // --- LOGIKA SAVE/LOAD HISTORY ---
+    function saveHistory() {
+        localStorage.setItem('herosms_history', JSON.stringify(acts));
+        localStorage.setItem('herosms_stats', JSON.stringify(counts));
+    }
+
+    function loadHistory() {
+        const h = localStorage.getItem('herosms_history');
+        const s = localStorage.getItem('herosms_stats');
+        if(s) { counts = JSON.parse(s); updateStats(); }
+        if(h) {
+            acts = JSON.parse(h);
+            const now = Date.now() / 1000;
+            const oList = document.getElementById('oList');
+            oList.innerHTML = ''; // Clear empty state
+            
+            // Urutkan & Filter yang < 20 menit
+            Object.values(acts)
+                .sort((a,b) => a.order_time - b.order_time)
+                .forEach(d => {
+                    const elapsed = now - d.order_time;
+                    if(elapsed < 1200) { // Masih valid (< 20 menit)
+                        renderOrder(d);
+                        if(d.status === 'waiting') {
+                            startTimer(d.id, d.order_time);
+                        } else {
+                            // Update UI untuk status non-waiting
+                            const el = document.getElementById(`order_${d.id}`);
+                            if(d.status === 'got_otp') {
+                                el.querySelector('.order-meta').innerHTML = `<div class="otp-box">${d.code}</div>`;
+                                stopTimer(d.id);
+                            } else {
+                                el.querySelector('.order-meta').innerHTML = `<span class="status-badge" style="background:var(--red); color:#fff">${d.status}</span>`;
+                                el.style.opacity = '0.5';
+                            }
+                        }
+                    } else {
+                        delete acts[d.id];
+                    }
+                });
+            saveHistory();
+        }
+    }
+
     const COUNTRIES = {
         vietnam: {n:'Vietnam', f:'🇻🇳'},
         philipina: {n:'Philipina', f:'🇵🇭'},
@@ -274,6 +318,7 @@
             document.getElementById('mainApp').classList.remove('hidden');
             const k = localStorage.getItem('api_key');
             if(k) { document.getElementById('apiInput').value=k; setKey(); }
+            loadHistory(); // Load history setelah login sukses
         } else {
             toast('❌ Pass Salah!', 'red');
             localStorage.removeItem('herosms_pass');
@@ -319,12 +364,19 @@
 
     socket.on('new_number', d => {
         counts.t++; counts.w++; updateStats();
+        acts[d.id] = d; // Save ke memori
+        saveHistory();  // Save ke storage
         renderOrder(d);
         startTimer(d.id, d.order_time);
     });
 
     socket.on('order_update', d => {
         const el = document.getElementById(`order_${d.id}`);
+        if(acts[d.id]) {
+            acts[d.id].status = d.status;
+            if(d.code) acts[d.id].code = d.code;
+            saveHistory();
+        }
         if(!el) return;
         if(d.status === 'got_otp') {
             counts.o++; counts.w--; updateStats();

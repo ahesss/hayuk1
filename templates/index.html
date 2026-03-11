@@ -123,6 +123,39 @@
 
 <script>
 {% if not logged_in %}
+    // ===== AUTO-LOGIN dari localStorage =====
+    (function autoLogin() {
+        const saved = localStorage.getItem('hero_auth');
+        if (saved) {
+            try {
+                const auth = JSON.parse(saved);
+                if (auth.code && auth.token) {
+                    // Sembunyikan login screen sementara
+                    document.getElementById('loginScreen').style.opacity = '0.3';
+                    
+                    fetch('/check_token', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({code: auth.code, token: auth.token})
+                    })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.valid) {
+                            window.location.reload(); // Session restored, reload ke dashboard
+                        } else {
+                            // Token tidak valid lagi, hapus
+                            localStorage.removeItem('hero_auth');
+                            document.getElementById('loginScreen').style.opacity = '1';
+                        }
+                    })
+                    .catch(() => {
+                        document.getElementById('loginScreen').style.opacity = '1';
+                    });
+                }
+            } catch(e) { localStorage.removeItem('hero_auth'); }
+        }
+    })();
+
     // ===== LOGIN VIA HTTP POST =====
     function doLogin() {
         const code = document.getElementById('codeInput').value.trim().toUpperCase();
@@ -140,7 +173,11 @@
         .then(r => r.json())
         .then(d => {
             if(d.success) {
-                window.location.reload(); // Reload untuk masuk dashboard
+                // Simpan ke localStorage agar survive browser close!
+                if (d.auth_token) {
+                    localStorage.setItem('hero_auth', JSON.stringify({code: code, token: d.auth_token}));
+                }
+                window.location.reload();
             } else {
                 errEl.innerText = '❌ ' + (d.error || 'Kode tidak valid');
                 errEl.style.display = 'block';

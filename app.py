@@ -105,6 +105,29 @@ def home():
         return render_template('index.html', countries=COUNTRIES, logged_in=True)
     return render_template('index.html', countries=COUNTRIES, logged_in=False)
 
+@app.route('/check_token', methods=['POST'])
+def check_token():
+    """Client cek apakah saved token masih valid (dari localStorage)."""
+    data = request.get_json()
+    if not data:
+        return jsonify({'valid': False})
+    code = data.get('code', '').strip().upper()
+    token = data.get('token', '')
+    
+    if code in access_codes:
+        stored_token = access_codes[code].get('auth_token')
+        if stored_token and stored_token == token:
+            session.permanent = True
+            session['authenticated'] = True
+            session['access_code'] = code
+            print(f"[AUTH] ✅ Token check OK: {code}")
+            sys.stdout.flush()
+            return jsonify({'valid': True})
+    
+    print(f"[AUTH] ❌ Token check GAGAL: {code}")
+    sys.stdout.flush()
+    return jsonify({'valid': False})
+
 @app.route('/login', methods=['POST'])
 def login():
     global access_codes
@@ -113,6 +136,14 @@ def login():
     print(f"[AUTH] Login attempt: '{code}'")
     print(f"[AUTH] Codes in memory: {len(access_codes)}")
     sys.stdout.flush()
+    
+    # Juga terima JSON body (untuk auto-login dari localStorage)
+    if request.is_json:
+        json_data = request.get_json()
+        code = json_data.get('code', '').strip().upper()
+        sent_token = json_data.get('auth_token', '')
+    else:
+        sent_token = ''
     
     if code not in access_codes:
         print(f"[AUTH] ❌ Code '{code}' TIDAK DITEMUKAN!")
@@ -127,14 +158,15 @@ def login():
         access_codes[code]['status'] = 'used'
         access_codes[code]['used_at'] = time.time()
         access_codes[code]['used_str'] = time.strftime('%Y-%m-%d %H:%M:%S')
-        access_codes[code]['auth_token'] = auth_token  # token unik per browser
+        access_codes[code]['auth_token'] = auth_token
         
         session.permanent = True
         session['authenticated'] = True
         session['access_code'] = code
         
         # Buat response dengan PERSISTENT COOKIE (survive browser close!)
-        resp = make_response(jsonify({'success': True}))
+        # Return token ke client agar bisa disimpan di localStorage
+        resp = make_response(jsonify({'success': True, 'auth_token': auth_token}))
         resp.set_cookie('hero_token', auth_token, max_age=COOKIE_MAX_AGE, secure=True, httponly=True, samesite='Lax')
         resp.set_cookie('hero_code', code, max_age=COOKIE_MAX_AGE, secure=True, httponly=True, samesite='Lax')
         
@@ -144,17 +176,17 @@ def login():
     
     elif code_info['status'] == 'used':
         # === KODE SUDAH TERPAKAI ===
-        # Cek apakah browser ini yang punya kode (via persistent cookie)
-        browser_token = request.cookies.get('hero_token')
+        # Cek via cookie ATAU via localStorage token yang dikirim
+        browser_token = request.cookies.get('hero_token') or sent_token
         stored_token = code_info.get('auth_token')
         
         if browser_token and stored_token and browser_token == stored_token:
-            # Browser yang SAMA - izinkan re-login
+            # Token cocok - izinkan re-login
             session.permanent = True
             session['authenticated'] = True
             session['access_code'] = code
             
-            resp = make_response(jsonify({'success': True}))
+            resp = make_response(jsonify({'success': True, 'auth_token': stored_token}))
             # Refresh cookies
             resp.set_cookie('hero_token', stored_token, max_age=COOKIE_MAX_AGE, secure=True, httponly=True, samesite='Lax')
             resp.set_cookie('hero_code', code, max_age=COOKIE_MAX_AGE, secure=True, httponly=True, samesite='Lax')

@@ -14,43 +14,42 @@
             --bg-card: rgba(22, 22, 50, 0.8);
             --border: rgba(99, 102, 241, 0.2);
             --accent: #6366f1;
-            --accent-glow: rgba(99, 102, 241, 0.4);
             --cyan: #06b6d4;
             --green: #10b981;
             --red: #ef4444;
             --yellow: #f59e0b;
-            --purple: #a855f7;
             --text: #e2e8f0;
             --text-dim: #94a3b8;
             --text-bright: #f8fafc;
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text); min-height: 100vh; overflow-x: hidden; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 20px; position: relative; z-index: 1; }
-        .login-screen { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-        .login-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 420px; backdrop-filter: blur(20px); text-align: center; }
-        input { width: 100%; padding: 14px 18px; background: rgba(15, 15, 35, 0.8); border: 1px solid var(--border); border-radius: 12px; color: var(--text-bright); font-family: 'Inter', sans-serif; outline: none; transition: 0.3s; }
-        .btn { padding: 14px 28px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        .login-screen { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 40px; width: 100%; max-width: 400px; backdrop-filter: blur(20px); text-align: center; }
+        input { width: 100%; padding: 14px 18px; background: rgba(15, 15, 35, 0.8); border: 1px solid var(--border); border-radius: 12px; color: var(--text-bright); outline: none; margin-bottom: 16px; }
+        .btn { padding: 14px 28px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
         .btn-primary { background: linear-gradient(135deg, var(--accent), #818cf8); color: white; }
-        .btn-success { background: linear-gradient(135deg, var(--green), #34d399); color: white; }
-        .btn-danger { background: linear-gradient(135deg, var(--red), #f87171); color: white; }
+        .btn-success { background: linear-gradient(135deg, var(--green), #34d399); color: white; width: 100%; height: 55px; font-size: 16px; }
+        .btn-danger { background: linear-gradient(135deg, var(--red), #f87171); color: white; width: 100%; height: 55px; font-size: 16px; }
         .btn-ghost { background: rgba(99, 102, 241, 0.1); color: var(--accent); border: 1px solid var(--border); }
-        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; text-align:center; }
-        .country-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 24px 0; }
-        .country-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: 0.3s; }
-        .country-card.selected { border-color: var(--accent); background: rgba(99,102,241,0.15); }
-        .order-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .cc-code { color: var(--accent); font-weight: 800; font-size: 17px; cursor: pointer; }
-        .phone-num { color: #fff; font-weight: 800; font-size: 17px; margin-left:10px; cursor: pointer; }
-        .otp-box { background: rgba(16,185,129,0.15); color: var(--green); padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 24px; cursor:pointer; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 15px; text-align:center; }
+        .country-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 20px 0; }
+        .country-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 15px; cursor: pointer; text-align: center; transition: 0.3s; }
+        .country-card.selected { border-color: var(--accent); background: rgba(99,102,241,0.2); transform: translateY(-3px); }
+        .order-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-left: 4px solid var(--accent); }
+        .order-card.done { border-left-color: var(--green); }
+        .cc-code { color: var(--accent); font-weight: 900; font-size: 18px; cursor: pointer; }
+        .phone-num { color: #fff; font-weight: 900; font-size: 18px; margin-left:8px; cursor: pointer; }
+        .otp-box { background: rgba(16,185,129,0.2); color: var(--green); padding: 10px 20px; border-radius: 10px; font-weight: 900; font-size: 26px; cursor:pointer; border: 1px solid var(--green); }
         .toast-box { position: fixed; top: 20px; right: 20px; z-index: 9999; }
-        .toast { background: var(--bg-card); padding: 12px 24px; border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
+        .toast { background: var(--bg-card); padding: 12px 24px; border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 8px; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
 <script>
-    // --- INSTANT MASKING ---
     (function() {
         if(localStorage.getItem('herosms_pass')) {
             document.write('<style>#loginScreen { display: none !important; } #mainApp { display: block !important; }</style>');
@@ -58,41 +57,40 @@
     })();
 </script>
 
-<!-- Login -->
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
         <h1>⚡ HeroSMS MEGA</h1>
-        <p>Ultra Brutal Web Dashboard v11.0</p>
-        <input type="password" id="passInput" placeholder="Password Akses" style="margin-bottom: 16px;">
-        <button class="btn btn-primary" style="width:100%" onclick="login()">🔓 Buka Dashboard</button>
+        <p style="margin-bottom:24px; color:var(--text-dim)">Ultra Stable Dashboard v12.0</p>
+        <input type="password" id="passInput" placeholder="Password Akses">
+        <button class="btn btn-primary" style="width:100%" onclick="login()">Buka Dashboard</button>
     </div>
 </div>
 
-<!-- Main -->
 <div id="mainApp" class="container hidden">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h1>⚡ HeroSMS MEGA</h1>
-        <div style="background:rgba(16,185,129,0.1); padding:8px 16px; border-radius:12px; border:1px solid var(--green)">
-            <span id="balVal">0.00</span> USD <button onclick="getBal()" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px;">🔄</button>
+        <h1 style="font-size:24px;">⚡ HeroSMS MEGA</h1>
+        <div style="background:rgba(16,185,129,0.1); padding:10px 20px; border-radius:12px; border:1px solid var(--green)">
+            <b id="balVal" style="color:var(--green); font-size:18px;">0.00</b> <span style="font-size:12px">USD</span>
+            <button onclick="getBal()" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px; font-size:18px;">🔄</button>
         </div>
     </div>
 
-    <div style="background:var(--bg-card); padding:20px; border-radius:16px; border:1px solid var(--border); display:flex; gap:12px; margin-bottom:24px;">
-        <input type="text" id="apiInput" placeholder="API Key">
-        <button class="btn btn-primary" onclick="saveKey()">Simpan</button>
+    <div style="background:var(--bg-card); padding:20px; border-radius:16px; border:1px solid var(--border); display:flex; gap:10px; margin-bottom:24px;">
+        <input type="text" id="apiInput" placeholder="Masukkan API Key Hero-SMS" style="margin-bottom:0">
+        <button class="btn btn-primary" id="btnSave" onclick="saveKey()">Simpan Key</button>
     </div>
 
-    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:24px;">
-        <div class="stat-card">Total: <b id="statT">0</b></div>
-        <div class="stat-card" style="color:var(--green)">OTP: <b id="statO">0</b></div>
-        <div class="stat-card" style="color:var(--yellow)">Wait: <b id="statW">0</b></div>
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:24px;">
+        <div class="stat-card">Total<br><b id="statT" style="font-size:20px">0</b></div>
+        <div class="stat-card" style="color:var(--green)">OTP<br><b id="statO" style="font-size:20px">0</b></div>
+        <div class="stat-card" style="color:var(--yellow)">Wait<br><b id="statW" style="font-size:20px">0</b></div>
     </div>
 
     <div class="country-grid" id="cGrid"></div>
 
-    <div style="background:var(--bg-card); padding:24px; border-radius:16px; border:1px solid var(--accent); margin-bottom:24px;">
-        <h3 id="selName" style="margin-bottom:16px;">🛒 Nembak Nomor Vietnam</h3>
-        <div style="display:flex; gap:10px; margin-bottom:20px;">
+    <div style="background:var(--bg-card); padding:24px; border-radius:20px; border:2px solid var(--accent); margin-bottom:24px; box-shadow: 0 0 30px var(--accent-glow)">
+        <h3 id="selName" style="margin-bottom:16px; font-weight:800; font-size:20px;">🛒 Nembak Nomor Vietnam</h3>
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:20px;">
             <button class="btn btn-ghost" onclick="buy(1)">1</button>
             <button class="btn btn-ghost" onclick="buy(2)">2</button>
             <button class="btn btn-ghost" onclick="buy(5)">5</button>
@@ -108,28 +106,22 @@
 <div class="toast-box" id="tBox"></div>
 
 <script>
-    const socket = io({transports:['websocket','polling']});
+    const socket = io({transports:['websocket','polling'], reconnection: true, reconnectionDelay: 1000});
     let sel = 'vietnam';
     let acts = {};
-    let timers = {};
     let counts = {t:0, o:0, w:0};
 
-    const COUNTRIES = {
-        vietnam: {n:'Vietnam', f:'🇻🇳'},
-        philipina: {n:'Philipina', f:'🇵🇭'},
-        colombia: {n:'Colombia', f:'🇨🇴'},
-        mexico: {n:'Mexico', f:'🇲🇽'},
-        brazil: {n:'Brazil', f:'🇧🇷'}
-    };
-
-    // Helper Creds
-    const creds = () => ({
+    // Helper: Ambil data tersimpan
+    const getStored = () => ({
         password: localStorage.getItem('herosms_pass'),
         api_key: localStorage.getItem('api_key')
     });
 
+    // --- RE-INIT SETIAP CONNECT ---
     socket.on('connect', () => {
-        if(creds().password) socket.emit('check_auth', creds());
+        const data = getStored();
+        if(data.api_key) socket.emit('init_session', {api_key: data.api_key});
+        if(data.password) socket.emit('check_auth', {password: data.password});
     });
 
     function login() {
@@ -154,22 +146,35 @@
 
     function saveKey() {
         const k = document.getElementById('apiInput').value;
+        if(!k) return toast('Masukkan API Key!');
         localStorage.setItem('api_key', k);
+        socket.emit('init_session', {api_key: k});
         getBal();
+        toast('✅ API Key Disimpan!');
     }
 
-    function getBal() { socket.emit('get_balance', creds()); }
+    function getBal() { socket.emit('get_balance', getStored()); }
     socket.on('balance_update', d => document.getElementById('balVal').innerText = d.balance);
+    socket.on('error_msg', d => toast('❌ ' + d.message));
 
-    function buy(n) { socket.emit('buy_number', {...creds(), country: sel, count: n}); }
-    function startAB() { socket.emit('start_autobuy', {...creds(), country: sel}); }
-    function stopAB() { socket.emit('stop_autobuy'); }
+    function buy(n) { socket.emit('buy_number', {...getStored(), country: sel, count: n}); }
+    function startAB() { socket.emit('start_autobuy', {...getStored(), country: sel}); }
+    function stopAB() { socket.emit('stop_autobuy', getStored()); }
 
-    // Socket listeners tetap sama
-    socket.on('autobuy_started', d => { document.getElementById('btnA').classList.add('hidden'); document.getElementById('btnS').classList.remove('hidden'); });
-    socket.on('autobuy_stopped', () => { document.getElementById('btnA').classList.remove('hidden'); document.getElementById('btnS').classList.add('hidden'); });
+    socket.on('autobuy_started', d => {
+        document.getElementById('btnA').classList.add('hidden');
+        document.getElementById('btnS').classList.remove('hidden');
+        toast('🔥 War Dimulai!');
+    });
+
+    socket.on('autobuy_stopped', () => {
+        document.getElementById('btnA').classList.remove('hidden');
+        document.getElementById('btnS').classList.add('hidden');
+        toast('🛑 War Berhenti.');
+    });
 
     socket.on('new_number', d => {
+        if(acts[d.id]) return;
         counts.t++; counts.w++; updateStats();
         acts[d.id] = d; saveHistory();
         renderOrder(d); startTimer(d.id, d.order_time);
@@ -194,7 +199,7 @@
             </div>
             <div id="meta_${d.id}" style="text-align:right;">
                 <div id="time_${d.id}" style="font-size:13px; color:var(--yellow)">20:00</div>
-                <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" id="can_${d.id}" onclick="socket.emit('cancel_order', {...creds(), id:'${d.id}'})" disabled>Wait...</button>
+                <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px; margin-top:5px;" id="can_${d.id}" onclick="socket.emit('cancel_order', {...getStored(), id:'${d.id}'})" disabled>Wait...</button>
             </div>
         `;
         document.getElementById('oList').prepend(card);
@@ -202,22 +207,25 @@
 
     function updateOrderUI(d) {
         const meta = document.getElementById(`meta_${d.id}`);
-        if(!meta) return;
+        const card = document.getElementById(`order_${d.id}`);
+        if(!meta || !card) return;
         if(d.status==='got_otp') {
+            if(!card.classList.contains('done')) { counts.o++; counts.w--; updateStats(); card.classList.add('done'); }
             meta.innerHTML = `<div class="otp-box" onclick="copy('${d.code}')">${d.code}</div>`;
             playBeep();
         } else if(['cancelled','timeout'].includes(d.status)) {
-            meta.innerHTML = `<span style="color:var(--red); font-size:12px; font-weight:800;">${d.status.toUpperCase()}</span>`;
-            document.getElementById(`order_${d.id}`).style.opacity = '0.5';
+            if(!card.classList.contains('done')) { counts.w--; updateStats(); card.classList.add('done'); }
+            meta.innerHTML = `<span style="color:var(--red); font-size:12px; font-weight:900;">${d.status.toUpperCase()}</span>`;
+            card.style.opacity = '0.5';
         }
     }
 
     function startTimer(id, st) {
-        timers[id] = setInterval(() => {
+        const t = setInterval(() => {
             const el = Date.now()/1000 - st, rem = 1200 - el;
-            if(rem <= 0) { clearInterval(timers[id]); return; }
+            if(rem <= 0) { clearInterval(t); return; }
             const tEl = document.getElementById(`time_${id}`);
-            if(tEl) tEl.innerText = `${Math.floor(rem/60)}:${Math.floor(rem%60)<10?'0':''}${Math.floor(rem%60)}`;
+            if(tEl) tEl.innerText = `${Math.floor(rem/60)}:${Math.floor(rem%60).toString().padStart(2,'0')}`;
             const cBtn = document.getElementById(`can_${id}`);
             if(cBtn && el >= 120) { cBtn.disabled = false; cBtn.innerText = '✕ Cancel'; cBtn.style.color = 'var(--red)'; }
             else if(cBtn) cBtn.innerText = `Wait ${Math.ceil(120-el)}s`;
@@ -236,18 +244,20 @@
 
     function updateStats() { document.getElementById('statT').innerText=counts.t; document.getElementById('statO').innerText=counts.o; document.getElementById('statW').innerText=counts.w; }
     function copy(t) { navigator.clipboard.writeText(t); toast(`📋 Copied: ${t}`); }
-    function toast(m) { const x = document.createElement('div'); x.className='toast'; x.innerText=m; document.getElementById('tBox').appendChild(x); setTimeout(()=>x.remove(), 2500); }
+    function toast(m) { const x = document.createElement('div'); x.className='toast'; x.innerText=m; document.getElementById('tBox').appendChild(x); setTimeout(()=>x.remove(), 3000); }
     function playBeep() { try { const a=new AudioContext(), o=a.createOscillator(), g=a.createGain(); o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.00001, a.currentTime+1); } catch(e){} }
 
-    // Render Grid
-    const g = document.getElementById('cGrid');
-    Object.entries(COUNTRIES).forEach(([k,v]) => {
+    const COUNTRIES_LIST = {
+        vietnam: {n:'Vietnam', f:'🇻🇳'}, philipina: {n:'Philipina', f:'🇵🇭'}, colombia: {n:'Colombia', f:'🇨🇴'}, mexico: {n:'Mexico', f:'🇲🇽'}, brazil: {n:'Brazil', f:'🇧🇷'}
+    };
+    const cGrid = document.getElementById('cGrid');
+    Object.entries(COUNTRIES_LIST).forEach(([k,v]) => {
         const d = document.createElement('div');
         d.className = `country-card ${k==sel?'selected':''}`;
         d.id = `card_${k}`;
         d.onclick = () => { sel = k; document.querySelectorAll('.country-card').forEach(x=>x.classList.remove('selected')); d.classList.add('selected'); document.getElementById('selName').innerText = `🛒 Nembak Nomor ${v.n}`; };
-        d.innerHTML = `<div class="flag">${v.f}</div><div class="name">${v.n}</div>`;
-        g.appendChild(d);
+        d.innerHTML = `<div style="font-size:24px">${v.f}</div><div style="font-size:14px; font-weight:700">${v.n}</div>`;
+        cGrid.appendChild(d);
     });
 </script>
 

@@ -11,16 +11,14 @@ from flask_socketio import SocketIO, emit
 
 # INIT APP
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_mega_secret_v5")
-# CORS AKTIF & PATH CLEAR
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_super_mega_brutal_v6")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # CONFIG
 API_BASE = "https://hero-sms.com/stubs/handler_api.php"
 ACCESS_PASSWORD = str(os.environ.get("ACCESS_PASSWORD", "admin123")).strip()
 
-print(f"\n[BOOT] HERO-SMS WEB STARTING...")
-print(f"[BOOT] PASSWORD: '{ACCESS_PASSWORD}'")
+print(f"\n[BOOT] HERO-SMS WEB MEGA BRUTAL STARTING...")
 sys.stdout.flush()
 
 COUNTRIES = {
@@ -86,7 +84,15 @@ def on_set_api(data):
     if 'ACCESS_BALANCE' in res:
         emit('api_result', {'success': True, 'balance': res.split(':')[-1]})
     else:
-        emit('api_result', {'success': False, 'message': 'API Key Tidak Valid'})
+        emit('api_result', {'success': False, 'message': 'API Key Invalid'})
+
+@socketio.on('get_balance')
+def handle_bal():
+    sid = request.sid
+    if sid in user_sessions and user_sessions[sid]['key']:
+        res = api_req(user_sessions[sid]['key'], 'getBalance')
+        if 'ACCESS_BALANCE' in res:
+            emit('balance_update', {'balance': res.split(':')[-1]})
 
 def otp_loop(sid, key, aid, st):
     while sid in user_sessions:
@@ -111,12 +117,11 @@ def on_buy(data):
     if not user_sessions.get(sid, {}).get('auth'): return
     key, ck = user_sessions[sid]['key'], data.get('country')
     count = int(data.get('count', 1))
-    
     def run():
         cnt = COUNTRIES[ck]
         socketio.emit('buy_status', {'message': f"Nembak {count} nomor..."}, room=sid)
         done = 0
-        for _ in range(count * 4):
+        for _ in range(count * 5):
             if done >= count or sid not in user_sessions: break
             p = {'service': 'wa', 'country': cnt['id']}
             if cnt['max']: p['maxPrice'] = cnt['max']
@@ -125,13 +130,13 @@ def on_buy(data):
                 parts = res.split(':')
                 if len(parts) >= 3:
                     aid, num = parts[1], parts[2]
-                    order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': get_price(key, aid, ck), 'country': ck, 'index': done+1}
+                    order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': get_price(key, aid, ck), 'country': ck, 'index': done+1, 'country_code': cnt['code']}
                     socketio.emit('new_number', order, room=sid)
                     socketio.start_background_task(otp_loop, sid, key, aid, order['order_time'])
                     done += 1
-                socketio.sleep(0.3)
+                socketio.sleep(0.2)
             elif 'NO_BALANCE' in res: break
-            socketio.sleep(0.12)
+            socketio.sleep(0.05)
         socketio.emit('buy_complete', {'count': done}, room=sid)
     socketio.start_background_task(run)
 
@@ -142,13 +147,12 @@ def on_auto(data):
     ck, key = data.get('country'), user_sessions[sid]['key']
     user_sessions[sid]['auto'] = True
     cnt = COUNTRIES[ck]
-    
     def run():
         att, found, last_ui, st = 0, 0, 0, time.time()
         socketio.emit('autobuy_started', {'country_name': cnt['name'], 'country': ck})
         while sid in user_sessions and user_sessions[sid]['auto']:
             att += 1
-            if (time.time() - last_ui) > 1.1:
+            if (time.time() - last_ui) > 1.0:
                 el = int(time.time() - st)
                 socketio.emit('autobuy_stats', {'attempts': att, 'found': found, 'elapsed': el, 'speed': round(att/max(el,1), 1)})
                 last_ui = time.time()
@@ -160,18 +164,27 @@ def on_auto(data):
                 if len(parts) >= 3:
                     aid, num = parts[1], parts[2]
                     found += 1
-                    order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': get_price(key, aid, ck), 'country': ck, 'index': found}
+                    order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': get_price(key, aid, ck), 'country': ck, 'index': found, 'country_code': cnt['code']}
                     socketio.emit('new_number', order, room=sid)
                     socketio.start_background_task(otp_loop, sid, key, aid, order['order_time'])
                     socketio.sleep(0.4)
             elif 'NO_BALANCE' in res: break
-            else: socketio.sleep(0.04)
+            else:
+                # MEGA BRUTAL DELAY
+                socketio.sleep(0.01)
         socketio.emit('autobuy_stopped', {'total': found})
     socketio.start_background_task(run)
 
 @socketio.on('stop_autobuy')
 def on_stop():
     if request.sid in user_sessions: user_sessions[request.sid]['auto'] = False
+
+@socketio.on('cancel_order')
+def on_cancel(data):
+    sid = request.sid
+    if sid in user_sessions and user_sessions[sid]['key']:
+        api_req(user_sessions[sid]['key'], 'setStatus', status='8', id=data.get('id'))
+        socketio.emit('order_update', {'id': data.get('id'), 'status': 'cancelled'}, room=sid)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

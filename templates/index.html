@@ -41,7 +41,7 @@
         .order-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .cc-code { color: var(--accent); font-weight: 800; font-size: 17px; cursor: pointer; }
         .phone-num { color: #fff; font-weight: 800; font-size: 17px; margin-left:10px; cursor: pointer; }
-        .otp-box { background: rgba(16,185,129,0.15); color: var(--green); padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 22px; cursor:pointer; }
+        .otp-box { background: rgba(16,185,129,0.15); color: var(--green); padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 24px; cursor:pointer; }
         .toast-box { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: var(--bg-card); padding: 12px 24px; border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
         .hidden { display: none !important; }
@@ -50,10 +50,9 @@
 <body>
 
 <script>
-    // --- INSTANT MASKING (CEGAH FLICKER) ---
+    // --- INSTANT MASKING ---
     (function() {
-        const p = localStorage.getItem('herosms_pass');
-        if(p) {
+        if(localStorage.getItem('herosms_pass')) {
             document.write('<style>#loginScreen { display: none !important; } #mainApp { display: block !important; }</style>');
         }
     })();
@@ -63,7 +62,7 @@
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
         <h1>⚡ HeroSMS MEGA</h1>
-        <p>Ultra Brutal Web Dashboard v9.0</p>
+        <p>Ultra Brutal Web Dashboard v11.0</p>
         <input type="password" id="passInput" placeholder="Password Akses" style="margin-bottom: 16px;">
         <button class="btn btn-primary" style="width:100%" onclick="login()">🔓 Buka Dashboard</button>
     </div>
@@ -74,13 +73,13 @@
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h1>⚡ HeroSMS MEGA</h1>
         <div style="background:rgba(16,185,129,0.1); padding:8px 16px; border-radius:12px; border:1px solid var(--green)">
-            <span id="balVal">0.00</span> USD <button onclick="refBal()" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px;">🔄</button>
+            <span id="balVal">0.00</span> USD <button onclick="getBal()" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px;">🔄</button>
         </div>
     </div>
 
     <div style="background:var(--bg-card); padding:20px; border-radius:16px; border:1px solid var(--border); display:flex; gap:12px; margin-bottom:24px;">
         <input type="text" id="apiInput" placeholder="API Key">
-        <button class="btn btn-primary" onclick="setKey()">Simpan</button>
+        <button class="btn btn-primary" onclick="saveKey()">Simpan</button>
     </div>
 
     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:24px;">
@@ -103,11 +102,6 @@
         <button class="btn btn-danger hidden" id="btnS" onclick="stopAB()">🛑 STOP WAR</button>
     </div>
 
-    <div id="abP" class="hidden" style="background:rgba(99,102,241,0.1); padding:20px; border-radius:16px; border:1px solid var(--accent); margin-bottom:24px; text-align:center;">
-        <div id="abAtt" style="font-size:32px; font-weight:900; color:var(--cyan)">0</div>
-        <div style="font-size:12px; color:var(--text-dim)">ATTEMPTS / <span id="abSpd">0</span> REQ/S</div>
-    </div>
-
     <div id="oList"></div>
 </div>
 
@@ -120,99 +114,60 @@
     let timers = {};
     let counts = {t:0, o:0, w:0};
 
-    // UserID berbasis Password agar kamar tetap sama biarpun refresh
-    const getUID = () => {
-        const p = localStorage.getItem('herosms_pass') || 'guest';
-        return btoa(p).slice(0, 16); // Encode simpel
+    const COUNTRIES = {
+        vietnam: {n:'Vietnam', f:'🇻🇳'},
+        philipina: {n:'Philipina', f:'🇵🇭'},
+        colombia: {n:'Colombia', f:'🇨🇴'},
+        mexico: {n:'Mexico', f:'🇲🇽'},
+        brazil: {n:'Brazil', f:'🇧🇷'}
     };
 
-    socket.on('connect', () => {
-        socket.emit('join', {user_id: getUID()});
-        const p = localStorage.getItem('herosms_pass');
-        if(p) socket.emit('login', {user_id: getUID(), password: p});
+    // Helper Creds
+    const creds = () => ({
+        password: localStorage.getItem('herosms_pass'),
+        api_key: localStorage.getItem('api_key')
     });
 
-    function login() { 
+    socket.on('connect', () => {
+        if(creds().password) socket.emit('check_auth', creds());
+    });
+
+    function login() {
         const p = document.getElementById('passInput').value;
         localStorage.setItem('herosms_pass', p);
-        socket.emit('join', {user_id: getUID()});
-        socket.emit('login', {user_id: getUID(), password: p}); 
+        socket.emit('check_auth', {password: p});
     }
-    
-    socket.on('login_result', d => {
+
+    socket.on('auth_result', d => {
         if(d.success) {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             const k = localStorage.getItem('api_key');
-            if(k) { document.getElementById('apiInput').value=k; setKey(); }
+            if(k) { document.getElementById('apiInput').value = k; getBal(); }
             loadHistory();
         } else {
             localStorage.removeItem('herosms_pass');
+            alert('Password Salah!');
             location.reload();
         }
     });
 
-    // History Logic
-    function saveHistory() { localStorage.setItem('h', JSON.stringify(acts)); localStorage.setItem('s', JSON.stringify(counts)); }
-    function loadHistory() {
-        const h = localStorage.getItem('h'), s = localStorage.getItem('s');
-        if(s) { counts = JSON.parse(s); updateStats(); }
-        if(h) {
-            acts = JSON.parse(h);
-            const now = Date.now()/1000;
-            const list = document.getElementById('oList'); list.innerHTML = '';
-            Object.values(acts).sort((a,b)=>a.order_time-b.order_time).forEach(d => {
-                if(now - d.order_time < 1200) {
-                    renderOrder(d);
-                    if(d.status==='waiting') startTimer(d.id, d.order_time);
-                    else updateOrderUI(d);
-                } else delete acts[d.id];
-            });
-            saveHistory();
-        }
+    function saveKey() {
+        const k = document.getElementById('apiInput').value;
+        localStorage.setItem('api_key', k);
+        getBal();
     }
 
-    // Render Grid
-    const g = document.getElementById('cGrid');
-    Object.entries(COUNTRIES).forEach(([k,v]) => {
-        const d = document.createElement('div');
-        d.className = `country-card ${k==sel?'selected':''}`;
-        d.id = `card_${k}`;
-        d.onclick = () => {
-            sel = k;
-            document.querySelectorAll('.country-card').forEach(x=>x.classList.remove('selected'));
-            d.classList.add('selected');
-            document.getElementById('selName').innerText = `🛒 Nembak Nomor ${v.n}`;
-        };
-        d.innerHTML = `<div class="flag">${v.f}</div><div class="name">${v.n}</div>`;
-        g.appendChild(d);
-    });
-
-    function setKey() { const k = document.getElementById('apiInput').value; localStorage.setItem('api_key', k); socket.emit('set_api_key', {user_id: getUID(), api_key: k}); }
-    function refBal() { socket.emit('get_balance', {user_id: getUID()}); }
-    socket.on('api_result', d => { document.getElementById('balVal').innerText = d.balance; });
+    function getBal() { socket.emit('get_balance', creds()); }
     socket.on('balance_update', d => document.getElementById('balVal').innerText = d.balance);
 
-    function buy(n) { socket.emit('buy_number', {user_id: getUID(), country: sel, count: n}); }
-    function startAB() { socket.emit('start_autobuy', {user_id: getUID(), country: sel}); }
-    function stopAB() { socket.emit('stop_autobuy', {user_id: getUID()}); }
+    function buy(n) { socket.emit('buy_number', {...creds(), country: sel, count: n}); }
+    function startAB() { socket.emit('start_autobuy', {...creds(), country: sel}); }
+    function stopAB() { socket.emit('stop_autobuy'); }
 
-    socket.on('autobuy_started', d => {
-        document.getElementById('btnA').classList.add('hidden');
-        document.getElementById('btnS').classList.remove('hidden');
-        document.getElementById('abP').classList.remove('hidden');
-    });
-
-    socket.on('autobuy_stats', d => {
-        document.getElementById('abAtt').innerText = d.attempts;
-        document.getElementById('abSpd').innerText = d.speed;
-    });
-
-    socket.on('autobuy_stopped', () => {
-        document.getElementById('btnA').classList.remove('hidden');
-        document.getElementById('btnS').classList.add('hidden');
-        document.getElementById('abP').classList.add('hidden');
-    });
+    // Socket listeners tetap sama
+    socket.on('autobuy_started', d => { document.getElementById('btnA').classList.add('hidden'); document.getElementById('btnS').classList.remove('hidden'); });
+    socket.on('autobuy_stopped', () => { document.getElementById('btnA').classList.remove('hidden'); document.getElementById('btnS').classList.add('hidden'); });
 
     socket.on('new_number', d => {
         counts.t++; counts.w++; updateStats();
@@ -239,7 +194,7 @@
             </div>
             <div id="meta_${d.id}" style="text-align:right;">
                 <div id="time_${d.id}" style="font-size:13px; color:var(--yellow)">20:00</div>
-                <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" id="can_${d.id}" onclick="socket.emit('cancel_order', {user_id: getUID(), id:'${d.id}'})" disabled>Wait...</button>
+                <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" id="can_${d.id}" onclick="socket.emit('cancel_order', {...creds(), id:'${d.id}'})" disabled>Wait...</button>
             </div>
         `;
         document.getElementById('oList').prepend(card);
@@ -249,36 +204,51 @@
         const meta = document.getElementById(`meta_${d.id}`);
         if(!meta) return;
         if(d.status==='got_otp') {
-            const hasO = document.getElementById(`order_${d.id}`).classList.contains('done');
-            if(!hasO) { counts.o++; counts.w--; updateStats(); document.getElementById(`order_${d.id}`).classList.add('done'); }
             meta.innerHTML = `<div class="otp-box" onclick="copy('${d.code}')">${d.code}</div>`;
             playBeep();
         } else if(['cancelled','timeout'].includes(d.status)) {
-            const hasO = document.getElementById(`order_${d.id}`).classList.contains('done');
-            if(!hasO) { counts.w--; updateStats(); document.getElementById(`order_${d.id}`).classList.add('done'); }
             meta.innerHTML = `<span style="color:var(--red); font-size:12px; font-weight:800;">${d.status.toUpperCase()}</span>`;
             document.getElementById(`order_${d.id}`).style.opacity = '0.5';
         }
     }
 
     function startTimer(id, st) {
-        if(timers[id]) clearInterval(timers[id]);
         timers[id] = setInterval(() => {
             const el = Date.now()/1000 - st, rem = 1200 - el;
             if(rem <= 0) { clearInterval(timers[id]); return; }
-            const m = Math.floor(rem/60), s = Math.floor(rem%60);
             const tEl = document.getElementById(`time_${id}`);
-            if(tEl) tEl.innerText = `${m}:${s<10?'0':''}${s}`;
+            if(tEl) tEl.innerText = `${Math.floor(rem/60)}:${Math.floor(rem%60)<10?'0':''}${Math.floor(rem%60)}`;
             const cBtn = document.getElementById(`can_${id}`);
             if(cBtn && el >= 120) { cBtn.disabled = false; cBtn.innerText = '✕ Cancel'; cBtn.style.color = 'var(--red)'; }
             else if(cBtn) cBtn.innerText = `Wait ${Math.ceil(120-el)}s`;
         }, 1000);
     }
 
+    function saveHistory() { localStorage.setItem('h', JSON.stringify(acts)); localStorage.setItem('s', JSON.stringify(counts)); }
+    function loadHistory() {
+        const h = localStorage.getItem('h'), s = localStorage.getItem('s');
+        if(s) { counts = JSON.parse(s); updateStats(); }
+        if(h) {
+            acts = JSON.parse(h);
+            Object.values(acts).forEach(d => { if(Date.now()/1000 - d.order_time < 1200) { renderOrder(d); if(d.status==='waiting') startTimer(d.id, d.order_time); else updateOrderUI(d); } });
+        }
+    }
+
     function updateStats() { document.getElementById('statT').innerText=counts.t; document.getElementById('statO').innerText=counts.o; document.getElementById('statW').innerText=counts.w; }
     function copy(t) { navigator.clipboard.writeText(t); toast(`📋 Copied: ${t}`); }
     function toast(m) { const x = document.createElement('div'); x.className='toast'; x.innerText=m; document.getElementById('tBox').appendChild(x); setTimeout(()=>x.remove(), 2500); }
     function playBeep() { try { const a=new AudioContext(), o=a.createOscillator(), g=a.createGain(); o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.00001, a.currentTime+1); } catch(e){} }
+
+    // Render Grid
+    const g = document.getElementById('cGrid');
+    Object.entries(COUNTRIES).forEach(([k,v]) => {
+        const d = document.createElement('div');
+        d.className = `country-card ${k==sel?'selected':''}`;
+        d.id = `card_${k}`;
+        d.onclick = () => { sel = k; document.querySelectorAll('.country-card').forEach(x=>x.classList.remove('selected')); d.classList.add('selected'); document.getElementById('selName').innerText = `🛒 Nembak Nomor ${v.n}`; };
+        d.innerHTML = `<div class="flag">${v.f}</div><div class="name">${v.n}</div>`;
+        g.appendChild(d);
+    });
 </script>
 
 </body>

@@ -32,12 +32,18 @@ COUNTRIES = {
 # State Management
 autobuy_active = {} # key: bool
 
+# Connection pooling untuk kecepatan maksimal
+http_session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)
+http_session.mount('https://', adapter)
+http_session.mount('http://', adapter)
+
 def api_req(key, action, **kwargs):
     if not key: return "ERR_NO_KEY"
     p = {'api_key': key, 'action': action}
     p.update(kwargs)
     try:
-        r = requests.get(API_BASE, params=p, timeout=5)
+        r = http_session.get(API_BASE, params=p, timeout=5)
         return r.text.strip()
     except: return "ERR_HTTP"
 
@@ -117,7 +123,7 @@ def on_auto(data):
     if autobuy_active.get(key): return # Mencegah duplicate thread berjalan!
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    NUM_WORKERS = 3  # Jumlah penembak paralel
+    NUM_WORKERS = 5  # 5 penembak paralel!
 
     def single_worker(worker_id, shared):
         """Satu worker brutal yang terus menembak API tanpa henti"""

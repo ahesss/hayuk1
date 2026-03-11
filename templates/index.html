@@ -34,14 +34,14 @@
         .btn-success { background: linear-gradient(135deg, var(--green), #34d399); color: white; }
         .btn-danger { background: linear-gradient(135deg, var(--red), #f87171); color: white; }
         .btn-ghost { background: rgba(99, 102, 241, 0.1); color: var(--accent); border: 1px solid var(--border); }
-        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; text-align:center; }
         .country-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 24px 0; }
         .country-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: 0.3s; }
         .country-card.selected { border-color: var(--accent); background: rgba(99,102,241,0.15); }
         .order-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .cc-code { color: var(--accent); font-weight: 800; font-size: 17px; cursor: pointer; }
         .phone-num { color: #fff; font-weight: 800; font-size: 17px; margin-left:10px; cursor: pointer; }
-        .otp-box { background: rgba(16,185,129,0.15); color: var(--green); padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 18px; }
+        .otp-box { background: rgba(16,185,129,0.15); color: var(--green); padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 22px; cursor:pointer; }
         .toast-box { position: fixed; top: 20px; right: 20px; z-index: 9999; }
         .toast { background: var(--bg-card); padding: 12px 24px; border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
         .hidden { display: none !important; }
@@ -63,7 +63,7 @@
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
         <h1>⚡ HeroSMS MEGA</h1>
-        <p>Ultra Brutal Web Dashboard v8.0</p>
+        <p>Ultra Brutal Web Dashboard v9.0</p>
         <input type="password" id="passInput" placeholder="Password Akses" style="margin-bottom: 16px;">
         <button class="btn btn-primary" style="width:100%" onclick="login()">🔓 Buka Dashboard</button>
     </div>
@@ -74,7 +74,7 @@
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h1>⚡ HeroSMS MEGA</h1>
         <div style="background:rgba(16,185,129,0.1); padding:8px 16px; border-radius:12px; border:1px solid var(--green)">
-            <span id="balVal">0.00</span> USD <button onclick="socket.emit('get_balance')" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px;">🔄</button>
+            <span id="balVal">0.00</span> USD <button onclick="refBal()" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px;">🔄</button>
         </div>
     </div>
 
@@ -120,25 +120,27 @@
     let timers = {};
     let counts = {t:0, o:0, w:0};
 
-    const COUNTRIES = {
-        vietnam: {n:'Vietnam', f:'🇻🇳'},
-        philipina: {n:'Philipina', f:'🇵🇭'},
-        colombia: {n:'Colombia', f:'🇨🇴'},
-        mexico: {n:'Mexico', f:'🇲🇽'},
-        brazil: {n:'Brazil', f:'🇧🇷'}
+    // UserID berbasis Password agar kamar tetap sama biarpun refresh
+    const getUID = () => {
+        const p = localStorage.getItem('herosms_pass') || 'guest';
+        return btoa(p).slice(0, 16); // Encode simpel
     };
 
-    // Auto-Login Logic
     socket.on('connect', () => {
+        socket.emit('join', {user_id: getUID()});
         const p = localStorage.getItem('herosms_pass');
-        if(p) socket.emit('login', {password: p});
+        if(p) socket.emit('login', {user_id: getUID(), password: p});
     });
 
-    function login() { socket.emit('login', {password: document.getElementById('passInput').value}); }
+    function login() { 
+        const p = document.getElementById('passInput').value;
+        localStorage.setItem('herosms_pass', p);
+        socket.emit('join', {user_id: getUID()});
+        socket.emit('login', {user_id: getUID(), password: p}); 
+    }
     
     socket.on('login_result', d => {
         if(d.success) {
-            localStorage.setItem('herosms_pass', document.getElementById('passInput').value || localStorage.getItem('herosms_pass'));
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             const k = localStorage.getItem('api_key');
@@ -158,6 +160,7 @@
         if(h) {
             acts = JSON.parse(h);
             const now = Date.now()/1000;
+            const list = document.getElementById('oList'); list.innerHTML = '';
             Object.values(acts).sort((a,b)=>a.order_time-b.order_time).forEach(d => {
                 if(now - d.order_time < 1200) {
                     renderOrder(d);
@@ -185,13 +188,14 @@
         g.appendChild(d);
     });
 
-    function setKey() { const k = document.getElementById('apiInput').value; localStorage.setItem('api_key', k); socket.emit('set_api_key', {api_key: k}); }
+    function setKey() { const k = document.getElementById('apiInput').value; localStorage.setItem('api_key', k); socket.emit('set_api_key', {user_id: getUID(), api_key: k}); }
+    function refBal() { socket.emit('get_balance', {user_id: getUID()}); }
     socket.on('api_result', d => { document.getElementById('balVal').innerText = d.balance; });
     socket.on('balance_update', d => document.getElementById('balVal').innerText = d.balance);
 
-    function buy(n) { socket.emit('buy_number', {country: sel, count: n}); }
-    function startAB() { socket.emit('start_autobuy', {country: sel}); }
-    function stopAB() { socket.emit('stop_autobuy'); }
+    function buy(n) { socket.emit('buy_number', {user_id: getUID(), country: sel, count: n}); }
+    function startAB() { socket.emit('start_autobuy', {user_id: getUID(), country: sel}); }
+    function stopAB() { socket.emit('stop_autobuy', {user_id: getUID()}); }
 
     socket.on('autobuy_started', d => {
         document.getElementById('btnA').classList.add('hidden');
@@ -222,6 +226,7 @@
     });
 
     function renderOrder(d) {
+        if(document.getElementById(`order_${d.id}`)) return;
         const card = document.createElement('div');
         card.className = 'order-card';
         card.id = `order_${d.id}`;
@@ -234,7 +239,7 @@
             </div>
             <div id="meta_${d.id}" style="text-align:right;">
                 <div id="time_${d.id}" style="font-size:13px; color:var(--yellow)">20:00</div>
-                <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" id="can_${d.id}" onclick="socket.emit('cancel_order', {id:'${d.id}'})" disabled>Wait...</button>
+                <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" id="can_${d.id}" onclick="socket.emit('cancel_order', {user_id: getUID(), id:'${d.id}'})" disabled>Wait...</button>
             </div>
         `;
         document.getElementById('oList').prepend(card);
@@ -244,17 +249,20 @@
         const meta = document.getElementById(`meta_${d.id}`);
         if(!meta) return;
         if(d.status==='got_otp') {
-            counts.o++; counts.w--; updateStats();
+            const hasO = document.getElementById(`order_${d.id}`).classList.contains('done');
+            if(!hasO) { counts.o++; counts.w--; updateStats(); document.getElementById(`order_${d.id}`).classList.add('done'); }
             meta.innerHTML = `<div class="otp-box" onclick="copy('${d.code}')">${d.code}</div>`;
             playBeep();
         } else if(['cancelled','timeout'].includes(d.status)) {
-            counts.w--; updateStats();
+            const hasO = document.getElementById(`order_${d.id}`).classList.contains('done');
+            if(!hasO) { counts.w--; updateStats(); document.getElementById(`order_${d.id}`).classList.add('done'); }
             meta.innerHTML = `<span style="color:var(--red); font-size:12px; font-weight:800;">${d.status.toUpperCase()}</span>`;
             document.getElementById(`order_${d.id}`).style.opacity = '0.5';
         }
     }
 
     function startTimer(id, st) {
+        if(timers[id]) clearInterval(timers[id]);
         timers[id] = setInterval(() => {
             const el = Date.now()/1000 - st, rem = 1200 - el;
             if(rem <= 0) { clearInterval(timers[id]); return; }
@@ -270,7 +278,7 @@
     function updateStats() { document.getElementById('statT').innerText=counts.t; document.getElementById('statO').innerText=counts.o; document.getElementById('statW').innerText=counts.w; }
     function copy(t) { navigator.clipboard.writeText(t); toast(`📋 Copied: ${t}`); }
     function toast(m) { const x = document.createElement('div'); x.className='toast'; x.innerText=m; document.getElementById('tBox').appendChild(x); setTimeout(()=>x.remove(), 2500); }
-    function playBeep() { const a=new AudioContext(), o=a.createOscillator(), g=a.createGain(); o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.00001, a.currentTime+0.5); }
+    function playBeep() { try { const a=new AudioContext(), o=a.createOscillator(), g=a.createGain(); o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.00001, a.currentTime+1); } catch(e){} }
 </script>
 
 </body>

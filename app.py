@@ -37,7 +37,7 @@ def api_req(key, action, **kwargs):
     p = {'api_key': key, 'action': action}
     p.update(kwargs)
     try:
-        r = requests.get(API_BASE, params=p, timeout=15)
+        r = requests.get(API_BASE, params=p, timeout=5)
         return r.text.strip()
     except: return "ERR_HTTP"
 
@@ -117,29 +117,60 @@ def on_auto(data):
     if autobuy_active.get(key): return # Mencegah duplicate thread berjalan!
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
+    NUM_WORKERS = 3  # Jumlah penembak paralel
+
+    def single_worker(worker_id, shared):
+        """Satu worker brutal yang terus menembak API tanpa henti"""
+        while autobuy_active.get(key):
+            try:
+                res = api_req(key, 'getNumber', service='wa', country=cnt['id'], maxPrice=cnt['max'] if cnt['max'] else None)
+                shared['att'] += 1
+                if 'ACCESS_NUMBER' in res:
+                    parts = res.split(':')
+                    if len(parts) >= 3:
+                        aid, num = parts[1], parts[2]
+                        shared['found'] += 1
+                        order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': shared['found'], 'country_code': cnt['code']}
+                        socketio.emit('new_number', order, room=key)
+                        socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
+                    socketio.sleep(0.01)
+                elif 'NO_BALANCE' in res:
+                    autobuy_active[key] = False
+                    socketio.emit('error_msg', {'message': '💸 SALDO HABIS!'}, room=key)
+                    break
+                elif 'NO_NUMBERS' in res:
+                    socketio.sleep(0.01)  # Stok kosong, langsung retry
+                else:
+                    socketio.sleep(0.01)
+            except:
+                socketio.sleep(0.05)
+
     def run():
-        att, found, last_ui, st = 0, 0, 0, time.time()
+        shared = {'att': 0, 'found': 0}
+        st = time.time()
         socketio.emit('autobuy_started', {'country_name': cnt['name']}, room=key)
-        while key in autobuy_active and autobuy_active[key]:
-            att += 1
-            if (time.time() - last_ui) > 0.8:
-                el = int(time.time() - st)
-                socketio.emit('autobuy_stats', {'attempts': att, 'found': found, 'elapsed': el, 'speed': round(att/max(el,1), 1)}, room=key)
-                last_ui = time.time()
-            res = api_req(key, 'getNumber', service='wa', country=cnt['id'], maxPrice=cnt['max'] if cnt['max'] else None)
-            if 'ACCESS_NUMBER' in res:
-                parts = res.split(':')
-                if len(parts) >= 3:
-                    aid, num = parts[1], parts[2]
-                    found += 1
-                    order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': found, 'country_code': cnt['code']}
-                    socketio.emit('new_number', order, room=key)
-                    socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
-                    socketio.sleep(0.4)
-            elif 'NO_BALANCE' in res: break
-            else: socketio.sleep(0.05)
+
+        # Jalankan worker paralel
+        workers = []
+        for wid in range(NUM_WORKERS):
+            w = socketio.start_background_task(single_worker, wid, shared)
+            workers.append(w)
+
+        # UI updater loop
+        while autobuy_active.get(key):
+            el = int(time.time() - st)
+            socketio.emit('autobuy_stats', {
+                'attempts': shared['att'],
+                'found': shared['found'],
+                'elapsed': el,
+                'speed': round(shared['att']/max(el,1), 1)
+            }, room=key)
+            socketio.sleep(0.5)
+
         autobuy_active[key] = False
-        socketio.emit('autobuy_stopped', {'total': found}, room=key)
+        el = int(time.time() - st)
+        socketio.emit('autobuy_stats', {'attempts': shared['att'], 'found': shared['found'], 'elapsed': el, 'speed': round(shared['att']/max(el,1), 1)}, room=key)
+        socketio.emit('autobuy_stopped', {'total': shared['found']}, room=key)
     socketio.start_background_task(run)
 
 @socketio.on('stop_autobuy')

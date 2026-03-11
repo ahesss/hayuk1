@@ -26,7 +26,7 @@
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
         .login-screen { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
         .login-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 40px; width: 100%; max-width: 400px; backdrop-filter: blur(20px); text-align: center; }
-        input { width: 100%; padding: 14px 18px; background: rgba(15, 15, 35, 0.8); border: 1px solid var(--border); border-radius: 12px; color: var(--text-bright); outline: none; margin-bottom: 16px; }
+        input { width: 100%; padding: 14px 18px; background: rgba(15, 15, 35, 0.8); border: 1px solid var(--border); border-radius: 12px; color: var(--text-bright); outline: none; margin-bottom: 16px; font-family: 'Inter', sans-serif; }
         .btn { padding: 14px 28px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
         .btn-primary { background: linear-gradient(135deg, var(--accent), #818cf8); color: white; }
         .btn-success { background: linear-gradient(135deg, var(--green), #34d399); color: white; width: 100%; height: 55px; font-size: 16px; }
@@ -45,36 +45,33 @@
         .toast { background: var(--bg-card); padding: 12px 24px; border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 8px; animation: slideIn 0.3s ease-out; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .hidden { display: none !important; }
+        .login-error { color: var(--red); font-size: 13px; margin-top: 8px; display: none; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-<script>
-    (function() {
-        // RESET semua session lama
-        localStorage.removeItem('herosms_pass');
-        if(localStorage.getItem('herosms_code')) {
-            document.write('<style>#loginScreen { display: none !important; } #mainApp { display: block !important; }</style>');
-        }
-    })();
-</script>
-
+{% if not logged_in %}
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
         <h1>⚡ HeroSMS MEGA</h1>
         <p style="margin-bottom:24px; color:var(--text-dim)">Masukkan Kode Akses Anda</p>
-        <input type="text" id="passInput" placeholder="Kode Akses (contoh: HERO-XXXX-XXXX)" style="text-transform:uppercase; letter-spacing:2px; font-weight:700; text-align:center;">
-        <button class="btn btn-primary" style="width:100%" onclick="login()">🔓 Buka Dashboard</button>
+        <input type="text" id="codeInput" placeholder="Kode Akses (contoh: HERO-XXXX-XXXX)" style="text-transform:uppercase; letter-spacing:2px; font-weight:700; text-align:center;">
+        <button class="btn btn-primary" style="width:100%" id="loginBtn" onclick="doLogin()">🔓 Buka Dashboard</button>
+        <p class="login-error" id="loginError"></p>
         <p style="margin-top:16px; font-size:11px; color:var(--text-dim);">Hubungi admin untuk mendapatkan kode akses</p>
     </div>
 </div>
-
-<div id="mainApp" class="container hidden">
+{% else %}
+<div id="mainApp" class="container">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h1 style="font-size:24px;">⚡ HeroSMS MEGA</h1>
-        <div style="background:rgba(16,185,129,0.1); padding:10px 20px; border-radius:12px; border:1px solid var(--green)">
-            <b id="balVal" style="color:var(--green); font-size:18px;">0.00</b> <span style="font-size:12px">USD</span>
-            <button onclick="getBal()" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px; font-size:18px;">🔄</button>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="background:rgba(16,185,129,0.1); padding:10px 20px; border-radius:12px; border:1px solid var(--green)">
+                <b id="balVal" style="color:var(--green); font-size:18px;">0.00</b> <span style="font-size:12px">USD</span>
+                <button onclick="getBal()" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px; font-size:18px;">🔄</button>
+            </div>
+            <a href="/logout" style="color:var(--text-dim); font-size:12px; text-decoration:none;">🚪 Logout</a>
         </div>
     </div>
 
@@ -92,7 +89,7 @@
 
     <div class="country-grid" id="cGrid"></div>
 
-    <div style="background:var(--bg-card); padding:24px; border-radius:20px; border:2px solid var(--accent); margin-bottom:24px; box-shadow: 0 0 30px var(--accent-glow)">
+    <div style="background:var(--bg-card); padding:24px; border-radius:20px; border:2px solid var(--accent); margin-bottom:24px;">
         <h3 id="selName" style="margin-bottom:16px; font-weight:800; font-size:20px;">🛒 Nembak Nomor Vietnam</h3>
         <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:20px;">
             <button class="btn btn-ghost" onclick="buy(1)">1</button>
@@ -120,73 +117,58 @@
         <div id="cancelList"></div>
     </div>
 </div>
+{% endif %}
 
 <div class="toast-box" id="tBox"></div>
 
 <script>
+{% if not logged_in %}
+    // ===== LOGIN VIA HTTP POST =====
+    function doLogin() {
+        const code = document.getElementById('codeInput').value.trim().toUpperCase();
+        if(!code) return;
+        const btn = document.getElementById('loginBtn');
+        const errEl = document.getElementById('loginError');
+        btn.disabled = true;
+        btn.innerText = '⏳ Memverifikasi...';
+        errEl.style.display = 'none';
+        
+        const formData = new FormData();
+        formData.append('code', code);
+        
+        fetch('/login', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(d => {
+            if(d.success) {
+                window.location.reload(); // Reload untuk masuk dashboard
+            } else {
+                errEl.innerText = '❌ ' + (d.error || 'Kode tidak valid');
+                errEl.style.display = 'block';
+                btn.disabled = false;
+                btn.innerText = '🔓 Buka Dashboard';
+            }
+        })
+        .catch(e => {
+            errEl.innerText = '❌ Koneksi gagal, coba lagi';
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            btn.innerText = '🔓 Buka Dashboard';
+        });
+    }
+    
+    document.getElementById('codeInput').addEventListener('keypress', e => { if(e.key==='Enter') doLogin(); });
+{% else %}
+    // ===== DASHBOARD =====
     const socket = io({transports:['websocket','polling'], reconnection: true, reconnectionDelay: 1000});
     let sel = 'vietnam';
     let acts = {};
     let counts = {t:0, o:0, w:0, c:0};
-    let isManualLogin = false;
 
-    // Helper: Ambil data tersimpan
-    const getStored = () => ({
-        password: localStorage.getItem('herosms_code'),
-        api_key: localStorage.getItem('api_key')
-    });
+    const getStored = () => ({ api_key: localStorage.getItem('api_key') });
 
-    // --- RE-INIT SETIAP CONNECT ---
     socket.on('connect', () => {
-        console.log('[SOCKET] Connected!');
         const data = getStored();
         if(data.api_key) socket.emit('init_session', {api_key: data.api_key});
-        if(data.password && data.password.length > 3) {
-            console.log('[AUTH] Auto-login dengan kode tersimpan...');
-            socket.emit('check_auth', {password: data.password});
-        }
-    });
-
-    function login() {
-        const p = document.getElementById('passInput').value.trim().toUpperCase();
-        if(!p) return;
-        isManualLogin = true;
-        localStorage.setItem('herosms_code', p);
-        // Pastikan socket terhubung sebelum kirim
-        if(socket.connected) {
-            socket.emit('check_auth', {password: p});
-        } else {
-            toast('⏳ Menghubungkan ke server...');
-            socket.once('connect', () => {
-                socket.emit('check_auth', {password: p});
-            });
-        }
-    }
-
-    socket.on('auth_result', d => {
-        if(d.success) {
-            console.log('[AUTH] Login berhasil!');
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('mainApp').classList.remove('hidden');
-            if(d.code) localStorage.setItem('herosms_code', d.code);
-            const k = localStorage.getItem('api_key');
-            if(k) { document.getElementById('apiInput').value = k; getBal(); }
-            loadHistory();
-        } else {
-            if(isManualLogin) {
-                // Gagal login manual → hapus kode dan kasih pesan
-                localStorage.removeItem('herosms_code');
-                alert('Kode Akses tidak valid atau sudah dipakai orang lain!');
-                location.reload();
-            } else {
-                // Gagal auto-login → kode lama tidak valid, tampilkan form login
-                console.log('[AUTH] Auto-login gagal, tampilkan form login');
-                localStorage.removeItem('herosms_code');
-                document.getElementById('loginScreen').classList.remove('hidden');
-                document.getElementById('mainApp').classList.add('hidden');
-            }
-        }
-        isManualLogin = false;
     });
 
     function saveKey() {
@@ -270,7 +252,6 @@
             if(!card.classList.contains('done')) { counts.w--; counts.c++; updateStats(); card.classList.add('done'); }
             meta.innerHTML = `<span style="color:var(--red); font-size:12px; font-weight:900;">${d.status.toUpperCase()}</span>`;
             card.style.opacity = '0.5';
-            // Pindahkan ke daftar cancelled
             setTimeout(() => moveToCancelled(d.id), 2000);
         }
     }
@@ -341,6 +322,12 @@
         d.innerHTML = `<div style="font-size:24px">${v.f}</div><div style="font-size:14px; font-weight:700">${v.n}</div>`;
         cGrid.appendChild(d);
     });
+
+    // Auto-load
+    const savedKey = localStorage.getItem('api_key');
+    if(savedKey) { document.getElementById('apiInput').value = savedKey; getBal(); }
+    loadHistory();
+{% endif %}
 </script>
 
 </body>

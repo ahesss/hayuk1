@@ -150,7 +150,12 @@ def on_init(data):
 
 @socketio.on('check_auth')
 def on_check(data):
+    global access_codes
+    # SELALU reload dari file agar sinkron dengan kode yang di-generate admin
+    access_codes = load_codes()
     code = str(data.get('password', '')).strip().upper()
+    print(f"[AUTH] Kode masuk: '{code}' | Total kode tersedia: {len(access_codes)}")
+    sys.stdout.flush()
     # Cek apakah kode valid dan belum dipakai
     if code in access_codes and access_codes[code]['status'] == 'available':
         access_codes[code]['status'] = 'used'
@@ -158,13 +163,17 @@ def on_check(data):
         access_codes[code]['used_str'] = time.strftime('%Y-%m-%d %H:%M:%S')
         save_codes(access_codes)
         emit('auth_result', {'success': True, 'code': code})
-        print(f"[AUTH] Code {code} dipakai!")
+        print(f"[AUTH] ✅ Code {code} BERHASIL dipakai!")
         sys.stdout.flush()
     elif code in access_codes and access_codes[code]['status'] == 'used':
         # Kode sudah pernah dipakai — izinkan re-login dari browser yang sama
         emit('auth_result', {'success': True, 'code': code})
+        print(f"[AUTH] ✅ Code {code} re-login (sudah dipakai sebelumnya)")
+        sys.stdout.flush()
     else:
         emit('auth_result', {'success': False})
+        print(f"[AUTH] ❌ Code {code} DITOLAK! Kode tidak ditemukan.")
+        sys.stdout.flush()
 
 @socketio.on('get_balance')
 def on_bal(data):

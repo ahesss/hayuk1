@@ -24,199 +24,91 @@
             --text-dim: #94a3b8;
             --text-bright: #f8fafc;
         }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg-primary);
-            color: var(--text);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.08) 0%, transparent 50%),
-                        radial-gradient(ellipse at 80% 20%, rgba(6,182,212,0.06) 0%, transparent 50%),
-                        radial-gradient(ellipse at 50% 80%, rgba(168,85,247,0.05) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: 0;
-        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text); min-height: 100vh; overflow-x: hidden; }
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; position: relative; z-index: 1; }
-
-        /* LOGIN SCREEN */
-        .login-screen {
-            display: flex; justify-content: center; align-items: center;
-            min-height: 100vh; padding: 20px;
-        }
-        .login-box {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 48px 40px;
-            width: 100%; max-width: 420px;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 0 60px rgba(99,102,241,0.1);
-            text-align: center;
-        }
-        .login-box h1 {
-            font-size: 28px; font-weight: 800;
-            background: linear-gradient(135deg, var(--accent), var(--cyan));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            margin-bottom: 8px;
-        }
-        .login-box p { color: var(--text-dim); margin-bottom: 32px; font-size: 14px; }
-
-        /* INPUTS */
-        input {
-            width: 100%; padding: 14px 18px;
-            background: rgba(15, 15, 35, 0.8);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: var(--text-bright);
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            outline: none;
-            transition: all 0.3s;
-        }
-        input:focus { border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
-
-        /* BUTTONS */
-        .btn {
-            padding: 14px 28px;
-            border: none; border-radius: 12px;
-            font-family: 'Inter', sans-serif;
-            font-weight: 600; font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex; align-items: center; gap: 8px;
-        }
-        .btn-primary { background: linear-gradient(135deg, var(--accent), #818cf8); color: white; box-shadow: 0 4px 20px var(--accent-glow); }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 30px var(--accent-glow); }
+        .login-screen { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .login-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 420px; backdrop-filter: blur(20px); text-align: center; }
+        input { width: 100%; padding: 14px 18px; background: rgba(15, 15, 35, 0.8); border: 1px solid var(--border); border-radius: 12px; color: var(--text-bright); font-family: 'Inter', sans-serif; outline: none; transition: 0.3s; }
+        .btn { padding: 14px 28px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: linear-gradient(135deg, var(--accent), #818cf8); color: white; }
+        .btn-success { background: linear-gradient(135deg, var(--green), #34d399); color: white; }
         .btn-danger { background: linear-gradient(135deg, var(--red), #f87171); color: white; }
         .btn-ghost { background: rgba(99, 102, 241, 0.1); color: var(--accent); border: 1px solid var(--border); }
-        .btn-ghost:hover { background: rgba(99, 102, 241, 0.2); }
-        .btn-success { background: linear-gradient(135deg, var(--green), #34d399); color: white; box-shadow: 0 4px 20px rgba(16,185,129,0.3); }
-        .btn-full { width: 100%; justify-content: center; }
-
-        /* HEADER */
-        .header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; margin-bottom: 12px; }
-        .header h1 { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .header-bal { display: flex; align-items: center; gap: 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 8px 16px; border-radius: 12px; }
-        .header-bal .val { font-weight: 800; color: var(--green); }
-
-        /* API BOX */
-        .api-box { background: var(--bg-card); border-radius: 16px; padding: 20px; margin-bottom: 24px; border: 1px solid var(--border); display: flex; gap: 12px; align-items: center; }
-
-        /* STATS GRID */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; backdrop-filter: blur(10px); position: relative; overflow: hidden; }
-        .stat-card .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; }
-        .stat-card .value { font-size: 28px; font-weight: 800; }
-
-        /* COUNTRY GRID */
-        .country-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
-        .country-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; cursor: pointer; transition: all 0.3s; text-align: center; }
-        .country-card:hover { border-color: var(--accent); transform: translateY(-5px); box-shadow: 0 10px 40px rgba(99,102,241,0.2); }
-        .country-card.selected { border-color: var(--accent); background: rgba(99,102,241,0.15); box-shadow: 0 0 25px var(--accent-glow); }
-        .country-card .flag { font-size: 32px; margin-bottom: 8px; }
-        .country-card .name { font-weight: 700; font-size: 14px; }
-
-        /* AUTOBUY PANEL */
-        .autobuy-panel { background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15)); border: 1px solid var(--accent); border-radius: 16px; padding: 24px; margin-bottom: 24px; display: none; }
-        .autobuy-panel.active { display: block; animation: fadeIn 0.4s; }
-        .ab-stats { display: flex; justify-content: space-around; text-align: center; gap: 10px; }
-        .ab-stat .val { font-size: 26px; font-weight: 900; color: var(--cyan); }
-        .ab-stat .lab { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
-
-        /* ORDER ITEM - TELEGRAM STYLE */
-        .orders-container { display: flex; flex-direction: column; gap: 10px; }
-        .order-card { 
-            background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 20px;
-            display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; animation: slideIn 0.3s;
-        }
-        .order-info { display: flex; align-items: center; gap: 16px; }
-        .order-num-box { display: flex; align-items: center; background: rgba(0,0,0,0.3); padding: 8px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
-        .cc-code { color: var(--accent); font-weight: 800; font-size: 17px; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: 0.2s; }
-        .cc-code:hover { background: rgba(99,102,241,0.2); }
-        .phone-num { color: #fff; font-weight: 800; font-size: 17px; margin-left: 6px; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: 0.2s; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 10px; }
-        .phone-num:hover { background: rgba(255,255,255,0.1); }
-        
-        .otp-box { background: rgba(16,185,129,0.15); color: var(--green); padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 18px; letter-spacing: 1px; }
-        .order-meta { text-align: right; }
-        .timer { color: var(--yellow); font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-        .status-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; }
-        
-        /* TOAST */
-        .toast-box { position: fixed; top: 20px; right: 20px; z-index: 9999; pointer-events: none; }
-        .toast { background: var(--bg-card); padding: 12px 24px; border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 8px; animation: slideIn 0.3s; box-shadow: 0 10px 40px rgba(0,0,0,0.4); backdrop-filter: blur(20px); font-size: 14px; }
-
-        @keyframes slideIn { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+        .country-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 24px 0; }
+        .country-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: 0.3s; }
+        .country-card.selected { border-color: var(--accent); background: rgba(99,102,241,0.15); }
+        .order-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .cc-code { color: var(--accent); font-weight: 800; font-size: 17px; cursor: pointer; }
+        .phone-num { color: #fff; font-weight: 800; font-size: 17px; margin-left:10px; cursor: pointer; }
+        .otp-box { background: rgba(16,185,129,0.15); color: var(--green); padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 18px; }
+        .toast-box { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { background: var(--bg-card); padding: 12px 24px; border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
         .hidden { display: none !important; }
-        .copy-hint { font-size: 9px; color: var(--text-dim); margin-top: 2px; text-align: center; display: block; }
     </style>
 </head>
 <body>
+
+<script>
+    // --- INSTANT MASKING (CEGAH FLICKER) ---
+    (function() {
+        const p = localStorage.getItem('herosms_pass');
+        if(p) {
+            document.write('<style>#loginScreen { display: none !important; } #mainApp { display: block !important; }</style>');
+        }
+    })();
+</script>
 
 <!-- Login -->
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
         <h1>⚡ HeroSMS MEGA</h1>
-        <p>Ultra Brutal Web Dashboard v6.0</p>
+        <p>Ultra Brutal Web Dashboard v8.0</p>
         <input type="password" id="passInput" placeholder="Password Akses" style="margin-bottom: 16px;">
-        <button class="btn btn-primary btn-full" onclick="login()">🔓 Buka Dashboard</button>
+        <button class="btn btn-primary" style="width:100%" onclick="login()">🔓 Buka Dashboard</button>
     </div>
 </div>
 
 <!-- Main -->
 <div id="mainApp" class="container hidden">
-    <div class="header">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h1>⚡ HeroSMS MEGA</h1>
-        <div class="header-bal">
-            <span>Saldo: </span>
-            <span class="val" id="balVal">0.00</span>
-            <button class="btn btn-ghost" onclick="socket.emit('get_balance')" style="padding: 4px 8px; border-radius: 8px;">🔄</button>
+        <div style="background:rgba(16,185,129,0.1); padding:8px 16px; border-radius:12px; border:1px solid var(--green)">
+            <span id="balVal">0.00</span> USD <button onclick="socket.emit('get_balance')" style="background:none; border:none; cursor:pointer; color:var(--green); margin-left:10px;">🔄</button>
         </div>
     </div>
 
-    <div class="api-box">
-        <input type="text" id="apiInput" placeholder="Masukkan API Key Hero-SMS">
-        <button class="btn btn-primary" onclick="setKey()">Simpan Key</button>
+    <div style="background:var(--bg-card); padding:20px; border-radius:16px; border:1px solid var(--border); display:flex; gap:12px; margin-bottom:24px;">
+        <input type="text" id="apiInput" placeholder="API Key">
+        <button class="btn btn-primary" onclick="setKey()">Simpan</button>
     </div>
 
-    <div class="stats-grid">
-        <div class="stat-card"><div class="label">Total Order</div><div class="value" id="statT">0</div></div>
-        <div class="stat-card"><div class="label">OTP Ready</div><div class="value" style="color:var(--green)" id="statO">0</div></div>
-        <div class="stat-card"><div class="label">Menunggu</div><div class="value" style="color:var(--yellow)" id="statW">0</div></div>
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:24px;">
+        <div class="stat-card">Total: <b id="statT">0</b></div>
+        <div class="stat-card" style="color:var(--green)">OTP: <b id="statO">0</b></div>
+        <div class="stat-card" style="color:var(--yellow)">Wait: <b id="statW">0</b></div>
     </div>
 
     <div class="country-grid" id="cGrid"></div>
 
-    <div style="background:var(--bg-card); border-radius:16px; padding:24px; margin-bottom:24px; border:1px solid var(--border)">
-        <h3 id="selName" style="margin-bottom:16px; color:var(--text-bright)">🛒 Pilih Negara Menang War</h3>
-        <div style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap">
-            <button class="btn btn-ghost" style="width:50px" onclick="buy(1)">1</button>
-            <button class="btn btn-ghost" style="width:50px" onclick="buy(2)">2</button>
-            <button class="btn btn-ghost" style="width:50px" onclick="buy(5)">5</button>
-            <button class="btn btn-ghost" style="width:50px" onclick="buy(10)">10</button>
+    <div style="background:var(--bg-card); padding:24px; border-radius:16px; border:1px solid var(--accent); margin-bottom:24px;">
+        <h3 id="selName" style="margin-bottom:16px;">🛒 Nembak Nomor Vietnam</h3>
+        <div style="display:flex; gap:10px; margin-bottom:20px;">
+            <button class="btn btn-ghost" onclick="buy(1)">1</button>
+            <button class="btn btn-ghost" onclick="buy(2)">2</button>
+            <button class="btn btn-ghost" onclick="buy(5)">5</button>
+            <button class="btn btn-ghost" onclick="buy(10)">10</button>
         </div>
-        <div style="display:flex; gap:12px">
-            <button class="btn btn-success" id="btnA" onclick="startAB()">🚀 START MEGA BRUTAL</button>
-            <button class="btn btn-danger hidden" id="btnS" onclick="stopAB()">🛑 STOP WAR</button>
-        </div>
+        <button class="btn btn-success" id="btnA" onclick="startAB()">🚀 START 100X BRUTAL</button>
+        <button class="btn btn-danger hidden" id="btnS" onclick="stopAB()">🛑 STOP WAR</button>
     </div>
 
-    <div class="autobuy-panel" id="abP">
-        <div style="color:var(--accent); font-weight:800; margin-bottom:16px">🔥 WAR IS ACTIVE — MEGA BRUTAL 2.0</div>
-        <div class="ab-stats">
-            <div class="ab-stat"><div class="val" id="abAtt">0</div><div class="lab">Attempts</div></div>
-            <div class="ab-stat"><div class="val" id="abFnd">0</div><div class="lab">Found</div></div>
-            <div class="ab-stat"><div class="val" id="abSpd">0</div><div class="lab">Req/S</div></div>
-        </div>
+    <div id="abP" class="hidden" style="background:rgba(99,102,241,0.1); padding:20px; border-radius:16px; border:1px solid var(--accent); margin-bottom:24px; text-align:center;">
+        <div id="abAtt" style="font-size:32px; font-weight:900; color:var(--cyan)">0</div>
+        <div style="font-size:12px; color:var(--text-dim)">ATTEMPTS / <span id="abSpd">0</span> REQ/S</div>
     </div>
 
-    <div class="orders-container" id="oList"></div>
+    <div id="oList"></div>
 </div>
 
 <div class="toast-box" id="tBox"></div>
@@ -228,50 +120,6 @@
     let timers = {};
     let counts = {t:0, o:0, w:0};
 
-    // --- LOGIKA SAVE/LOAD HISTORY ---
-    function saveHistory() {
-        localStorage.setItem('herosms_history', JSON.stringify(acts));
-        localStorage.setItem('herosms_stats', JSON.stringify(counts));
-    }
-
-    function loadHistory() {
-        const h = localStorage.getItem('herosms_history');
-        const s = localStorage.getItem('herosms_stats');
-        if(s) { counts = JSON.parse(s); updateStats(); }
-        if(h) {
-            acts = JSON.parse(h);
-            const now = Date.now() / 1000;
-            const oList = document.getElementById('oList');
-            oList.innerHTML = ''; // Clear empty state
-            
-            // Urutkan & Filter yang < 20 menit
-            Object.values(acts)
-                .sort((a,b) => a.order_time - b.order_time)
-                .forEach(d => {
-                    const elapsed = now - d.order_time;
-                    if(elapsed < 1200) { // Masih valid (< 20 menit)
-                        renderOrder(d);
-                        if(d.status === 'waiting') {
-                            startTimer(d.id, d.order_time);
-                        } else {
-                            // Update UI untuk status non-waiting
-                            const el = document.getElementById(`order_${d.id}`);
-                            if(d.status === 'got_otp') {
-                                el.querySelector('.order-meta').innerHTML = `<div class="otp-box">${d.code}</div>`;
-                                stopTimer(d.id);
-                            } else {
-                                el.querySelector('.order-meta').innerHTML = `<span class="status-badge" style="background:var(--red); color:#fff">${d.status}</span>`;
-                                el.style.opacity = '0.5';
-                            }
-                        }
-                    } else {
-                        delete acts[d.id];
-                    }
-                });
-            saveHistory();
-        }
-    }
-
     const COUNTRIES = {
         vietnam: {n:'Vietnam', f:'🇻🇳'},
         philipina: {n:'Philipina', f:'🇵🇭'},
@@ -279,6 +127,47 @@
         mexico: {n:'Mexico', f:'🇲🇽'},
         brazil: {n:'Brazil', f:'🇧🇷'}
     };
+
+    // Auto-Login Logic
+    socket.on('connect', () => {
+        const p = localStorage.getItem('herosms_pass');
+        if(p) socket.emit('login', {password: p});
+    });
+
+    function login() { socket.emit('login', {password: document.getElementById('passInput').value}); }
+    
+    socket.on('login_result', d => {
+        if(d.success) {
+            localStorage.setItem('herosms_pass', document.getElementById('passInput').value || localStorage.getItem('herosms_pass'));
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            const k = localStorage.getItem('api_key');
+            if(k) { document.getElementById('apiInput').value=k; setKey(); }
+            loadHistory();
+        } else {
+            localStorage.removeItem('herosms_pass');
+            location.reload();
+        }
+    });
+
+    // History Logic
+    function saveHistory() { localStorage.setItem('h', JSON.stringify(acts)); localStorage.setItem('s', JSON.stringify(counts)); }
+    function loadHistory() {
+        const h = localStorage.getItem('h'), s = localStorage.getItem('s');
+        if(s) { counts = JSON.parse(s); updateStats(); }
+        if(h) {
+            acts = JSON.parse(h);
+            const now = Date.now()/1000;
+            Object.values(acts).sort((a,b)=>a.order_time-b.order_time).forEach(d => {
+                if(now - d.order_time < 1200) {
+                    renderOrder(d);
+                    if(d.status==='waiting') startTimer(d.id, d.order_time);
+                    else updateOrderUI(d);
+                } else delete acts[d.id];
+            });
+            saveHistory();
+        }
+    }
 
     // Render Grid
     const g = document.getElementById('cGrid');
@@ -296,52 +185,8 @@
         g.appendChild(d);
     });
 
-
-    // --- LOGIKA AUTO LOGIN INSTAN ---
-    (function() {
-        const p = localStorage.getItem('herosms_pass');
-        if(p) {
-            // Sembunyikan login screen secepat mungkin
-            document.write('<style>#loginScreen { display: none !important; } #mainApp { display: block !important; }</style>');
-            socket.on('connect', () => {
-                socket.emit('login', {password: p});
-            });
-        }
-    })();
-
-    function login() { 
-        const p = document.getElementById('passInput').value;
-        socket.emit('login', {password: p}); 
-    }
-    socket.on('login_result', d => {
-        if(d.success) {
-            const p = document.getElementById('passInput').value;
-            localStorage.setItem('herosms_pass', p);
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('mainApp').classList.remove('hidden');
-            const k = localStorage.getItem('api_key');
-            if(k) { document.getElementById('apiInput').value=k; setKey(); }
-            loadHistory(); // Load history setelah login sukses
-        } else {
-            // Jika gagal, pastikan layar login muncul kembali
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('mainApp').classList.add('hidden');
-            toast('❌ Pass Salah!', 'red');
-            localStorage.removeItem('herosms_pass');
-        }
-    });
-
-    function setKey() {
-        const k = document.getElementById('apiInput').value;
-        localStorage.setItem('api_key', k);
-        socket.emit('set_api_key', {api_key: k});
-    }
-
-    socket.on('api_result', d => {
-        if(d.success) { toast('✅ Key Valid! Keluar Saldo.'); document.getElementById('balVal').innerText = d.balance; }
-        else toast('❌ Key Error!', 'red');
-    });
-
+    function setKey() { const k = document.getElementById('apiInput').value; localStorage.setItem('api_key', k); socket.emit('set_api_key', {api_key: k}); }
+    socket.on('api_result', d => { document.getElementById('balVal').innerText = d.balance; });
     socket.on('balance_update', d => document.getElementById('balVal').innerText = d.balance);
 
     function buy(n) { socket.emit('buy_number', {country: sel, count: n}); }
@@ -351,145 +196,82 @@
     socket.on('autobuy_started', d => {
         document.getElementById('btnA').classList.add('hidden');
         document.getElementById('btnS').classList.remove('hidden');
-        document.getElementById('abP').classList.add('active');
-        toast(`🚀 MEGA BRUTAL AKTIF: ${d.country_name}`);
+        document.getElementById('abP').classList.remove('hidden');
     });
 
     socket.on('autobuy_stats', d => {
         document.getElementById('abAtt').innerText = d.attempts;
-        document.getElementById('abFnd').innerText = d.found;
         document.getElementById('abSpd').innerText = d.speed;
     });
 
-    socket.on('autobuy_stopped', d => {
+    socket.on('autobuy_stopped', () => {
         document.getElementById('btnA').classList.remove('hidden');
         document.getElementById('btnS').classList.add('hidden');
-        document.getElementById('abP').classList.remove('active');
-        toast(`🛑 War Berhenti. Dapat ${d.total} nomor.`);
+        document.getElementById('abP').classList.add('hidden');
     });
 
     socket.on('new_number', d => {
         counts.t++; counts.w++; updateStats();
-        acts[d.id] = d; // Save ke memori
-        saveHistory();  // Save ke storage
-        renderOrder(d);
-        startTimer(d.id, d.order_time);
+        acts[d.id] = d; saveHistory();
+        renderOrder(d); startTimer(d.id, d.order_time);
     });
 
     socket.on('order_update', d => {
-        const el = document.getElementById(`order_${d.id}`);
-        if(acts[d.id]) {
-            acts[d.id].status = d.status;
-            if(d.code) acts[d.id].code = d.code;
-            saveHistory();
-        }
-        if(!el) return;
-        if(d.status === 'got_otp') {
-            counts.o++; counts.w--; updateStats();
-            stopTimer(d.id);
-            el.querySelector('.order-meta').innerHTML = `<div class="otp-box">${d.code}</div>`;
-            el.querySelector('.timer').innerText = '✅ OTP FINISHED';
-            playBeep();
-        } else if(['cancelled','timeout'].includes(d.status)) {
-            counts.w--; updateStats();
-            stopTimer(d.id);
-            el.querySelector('.order-meta').innerHTML = `<span class="status-badge" style="background:var(--red); color:#fff">${d.status}</span>`;
-            el.style.opacity = '0.5';
-        }
+        if(acts[d.id]) { acts[d.id].status = d.status; if(d.code) acts[d.id].code = d.code; saveHistory(); }
+        updateOrderUI(acts[d.id] || d);
     });
 
     function renderOrder(d) {
-        const list = document.getElementById('oList');
         const card = document.createElement('div');
         card.className = 'order-card';
         card.id = `order_${d.id}`;
-        
-        // Split number
-        const num = d.number;
-        const cc = d.country_code || '';
-        const body = num.startsWith(cc) ? num.slice(cc.length) : num;
-
+        const cc = d.country_code || '', body = d.number.startsWith(cc)?d.number.slice(cc.length):d.number;
         card.innerHTML = `
-            <div class="order-info">
-                <span style="font-size:24px">${COUNTRIES[d.country]?.f || '🌍'}</span>
-                <div>
-                    <div class="order-num-box">
-                        <span class="cc-code" onclick="copy('${cc}')">${cc}</span>
-                        <span class="phone-num" onclick="copy('${body}')">${body}</span>
-                    </div>
-                    <div class="order-sub-meta">
-                        <span style="color:var(--text-dim); font-size:12px">💰 <b>${d.price || '0.00'}</b> USD</span>
-                        <span style="color:var(--accent); font-size:11px; margin-left:8px; opacity:0.8">#${d.id}</span>
-                    </div>
-                    <span class="copy-hint">Klik kode/nomor untuk salin</span>
-                </div>
+            <div style="display:flex; align-items:center;">
+                <span class="cc-code" onclick="copy('${cc}')">${cc}</span>
+                <span class="phone-num" onclick="copy('${body}')">${body}</span>
+                <div style="margin-left:15px; font-size:12px; color:var(--text-dim);">💰 <b>${d.price}</b></div>
             </div>
-            <div class="order-meta">
-                <div class="timer hidden" id="time_${d.id}">20:00</div>
-                <button id="cancel_${d.id}" class="btn btn-ghost" style="padding:4px 10px; font-size:11px; opacity:0.3; cursor:not-allowed" onclick="if(!this.disabled) socket.emit('cancel_order', {id:'${d.id}'})" disabled>✕ Wait 2m</button>
+            <div id="meta_${d.id}" style="text-align:right;">
+                <div id="time_${d.id}" style="font-size:13px; color:var(--yellow)">20:00</div>
+                <button class="btn btn-ghost" style="padding:4px 8px; font-size:11px;" id="can_${d.id}" onclick="socket.emit('cancel_order', {id:'${d.id}'})" disabled>Wait...</button>
             </div>
         `;
-        list.prepend(card);
+        document.getElementById('oList').prepend(card);
+    }
+
+    function updateOrderUI(d) {
+        const meta = document.getElementById(`meta_${d.id}`);
+        if(!meta) return;
+        if(d.status==='got_otp') {
+            counts.o++; counts.w--; updateStats();
+            meta.innerHTML = `<div class="otp-box" onclick="copy('${d.code}')">${d.code}</div>`;
+            playBeep();
+        } else if(['cancelled','timeout'].includes(d.status)) {
+            counts.w--; updateStats();
+            meta.innerHTML = `<span style="color:var(--red); font-size:12px; font-weight:800;">${d.status.toUpperCase()}</span>`;
+            document.getElementById(`order_${d.id}`).style.opacity = '0.5';
+        }
     }
 
     function startTimer(id, st) {
         timers[id] = setInterval(() => {
-            const elTime = (Date.now()/1000 - st);
-            const rem = 1200 - elTime;
-            
-            // Logic Unlock Cancel (2 Menit = 120 Detik)
-            const cancelBtn = document.getElementById(`cancel_${id}`);
-            if(cancelBtn) {
-                if(elTime >= 120) {
-                    cancelBtn.disabled = false;
-                    cancelBtn.style.opacity = '1';
-                    cancelBtn.style.cursor = 'pointer';
-                    cancelBtn.style.color = 'var(--red)';
-                    cancelBtn.style.borderColor = 'rgba(239,68,68,0.3)';
-                    cancelBtn.innerText = '✕ Cancel';
-                } else {
-                    const wait = Math.ceil(120 - elTime);
-                    cancelBtn.innerText = `✕ Wait ${wait}s`;
-                }
-            }
-
+            const el = Date.now()/1000 - st, rem = 1200 - el;
             if(rem <= 0) { clearInterval(timers[id]); return; }
             const m = Math.floor(rem/60), s = Math.floor(rem%60);
-            const el = document.getElementById(`time_${id}`);
-            if(el) el.innerText = `${m}:${s<10?'0':''}${s}`;
+            const tEl = document.getElementById(`time_${id}`);
+            if(tEl) tEl.innerText = `${m}:${s<10?'0':''}${s}`;
+            const cBtn = document.getElementById(`can_${id}`);
+            if(cBtn && el >= 120) { cBtn.disabled = false; cBtn.innerText = '✕ Cancel'; cBtn.style.color = 'var(--red)'; }
+            else if(cBtn) cBtn.innerText = `Wait ${Math.ceil(120-el)}s`;
         }, 1000);
     }
-    function stopTimer(id) { clearInterval(timers[id]); }
 
-    function updateStats() {
-        document.getElementById('statT').innerText = counts.t;
-        document.getElementById('statO').innerText = counts.o;
-        document.getElementById('statW').innerText = counts.w;
-    }
-
-    function copy(txt) {
-        navigator.clipboard.writeText(txt);
-        toast(`📋 Copied: ${txt}`);
-    }
-
-    function toast(m, c=null) {
-        const b = document.getElementById('tBox');
-        const x = document.createElement('div');
-        x.className = 'toast';
-        if(c) x.style.borderColor = c;
-        x.innerText = m;
-        b.appendChild(x);
-        setTimeout(() => { x.style.opacity='0'; setTimeout(()=>x.remove(),300); }, 3000);
-    }
-
-    function playBeep() {
-        const a = new AudioContext();
-        const o = a.createOscillator();
-        const g = a.createGain();
-        o.connect(g); g.connect(a.destination);
-        o.frequency.value = 880; o.start();
-        g.gain.exponentialRampToValueAtTime(0.00001, a.currentTime + 0.5);
-    }
+    function updateStats() { document.getElementById('statT').innerText=counts.t; document.getElementById('statO').innerText=counts.o; document.getElementById('statW').innerText=counts.w; }
+    function copy(t) { navigator.clipboard.writeText(t); toast(`📋 Copied: ${t}`); }
+    function toast(m) { const x = document.createElement('div'); x.className='toast'; x.innerText=m; document.getElementById('tBox').appendChild(x); setTimeout(()=>x.remove(), 2500); }
+    function playBeep() { const a=new AudioContext(), o=a.createOscillator(), g=a.createGain(); o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.00001, a.currentTime+0.5); }
 </script>
+
 </body>
 </html>

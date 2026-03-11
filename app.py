@@ -51,6 +51,8 @@ def on_init(data):
         join_room(key) # Ikat semua urusan ke API KEY ini
         print(f"[SESSION] User linked to API Key: {key[:8]}...")
         sys.stdout.flush()
+        if autobuy_active.get(key):
+            emit('autobuy_started', {'country_name': 'Berjalan'})
 
 @socketio.on('check_auth')
 def on_check(data):
@@ -112,6 +114,7 @@ def on_buy(data):
 @socketio.on('start_autobuy')
 def on_auto(data):
     key, ck = data.get('api_key'), data.get('country')
+    if autobuy_active.get(key): return # Mencegah duplicate thread berjalan!
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
     def run():
@@ -134,7 +137,8 @@ def on_auto(data):
                     socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
                     socketio.sleep(0.4)
             elif 'NO_BALANCE' in res: break
-            else: socketio.sleep(0.001)
+            else: socketio.sleep(0.05)
+        autobuy_active[key] = False
         socketio.emit('autobuy_stopped', {'total': found}, room=key)
     socketio.start_background_task(run)
 

@@ -349,7 +349,7 @@
                 </div>
             </div>
             <div class="order-meta">
-                <div class="timer" id="time_${d.id}">20:00</div>
+                <div class="timer" id="time_${d.id}">02:00</div>
                 <button class="btn btn-ghost" style="padding:4px 10px; font-size:11px; border-color:rgba(239,68,68,0.3); color:var(--red)" onclick="socket.emit('cancel_order', {id:'${d.id}'})">✕ Cancel</button>
             </div>
         `;
@@ -358,7 +358,7 @@
 
     function startTimer(id, st) {
         timers[id] = setInterval(() => {
-            const rem = 1200 - (Date.now()/1000 - st);
+            const rem = 120 - (Date.now()/1000 - st);
             if(rem <= 0) { clearInterval(timers[id]); return; }
             const m = Math.floor(rem/60), s = Math.floor(rem%60);
             const el = document.getElementById(`time_${id}`);

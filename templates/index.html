@@ -128,6 +128,7 @@
     let sel = 'vietnam';
     let acts = {};
     let counts = {t:0, o:0, w:0, c:0};
+    let isManualLogin = false;
 
     // Helper: Ambil data tersimpan
     const getStored = () => ({
@@ -137,30 +138,55 @@
 
     // --- RE-INIT SETIAP CONNECT ---
     socket.on('connect', () => {
+        console.log('[SOCKET] Connected!');
         const data = getStored();
         if(data.api_key) socket.emit('init_session', {api_key: data.api_key});
-        if(data.password) socket.emit('check_auth', {password: data.password});
+        if(data.password && data.password.length > 3) {
+            console.log('[AUTH] Auto-login dengan kode tersimpan...');
+            socket.emit('check_auth', {password: data.password});
+        }
     });
 
     function login() {
         const p = document.getElementById('passInput').value.trim().toUpperCase();
         if(!p) return;
+        isManualLogin = true;
         localStorage.setItem('herosms_code', p);
-        socket.emit('check_auth', {password: p});
+        // Pastikan socket terhubung sebelum kirim
+        if(socket.connected) {
+            socket.emit('check_auth', {password: p});
+        } else {
+            toast('⏳ Menghubungkan ke server...');
+            socket.once('connect', () => {
+                socket.emit('check_auth', {password: p});
+            });
+        }
     }
 
     socket.on('auth_result', d => {
         if(d.success) {
+            console.log('[AUTH] Login berhasil!');
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
+            if(d.code) localStorage.setItem('herosms_code', d.code);
             const k = localStorage.getItem('api_key');
             if(k) { document.getElementById('apiInput').value = k; getBal(); }
             loadHistory();
         } else {
-            localStorage.removeItem('herosms_code');
-            alert('Kode Akses tidak valid atau sudah dipakai orang lain!');
-            location.reload();
+            if(isManualLogin) {
+                // Gagal login manual → hapus kode dan kasih pesan
+                localStorage.removeItem('herosms_code');
+                alert('Kode Akses tidak valid atau sudah dipakai orang lain!');
+                location.reload();
+            } else {
+                // Gagal auto-login → kode lama tidak valid, tampilkan form login
+                console.log('[AUTH] Auto-login gagal, tampilkan form login');
+                localStorage.removeItem('herosms_code');
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('mainApp').classList.add('hidden');
+            }
         }
+        isManualLogin = false;
     });
 
     function saveKey() {

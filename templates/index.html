@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HeroSMS Ultra Brutal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a1a;
+            --bg-secondary: #12122a;
+            --bg-card: rgba(22, 22, 50, 0.8);
+            --border: rgba(99, 102, 241, 0.2);
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --cyan: #06b6d4;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --purple: #a855f7;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --text-bright: #f8fafc;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(6,182,212,0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(168,85,247,0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; position: relative; z-index: 1; }
+
+        /* LOGIN SCREEN */
+        .login-screen {
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 20px;
+        }
+        .login-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 48px 40px;
+            width: 100%; max-width: 420px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 0 60px rgba(99,102,241,0.1);
+            text-align: center;
+        }
+        .login-box h1 {
+            font-size: 28px; font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), var(--cyan));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        .login-box p { color: var(--text-dim); margin-bottom: 32px; font-size: 14px; }
+
+        /* INPUTS */
+        input, .input {
+            width: 100%; padding: 14px 18px;
+            background: rgba(15, 15, 35, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-bright);
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
+        input::placeholder { color: var(--text-dim); }
+
+        /* BUTTONS */
+        .btn {
+            padding: 14px 28px;
+            border: none; border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600; font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #818cf8);
+            color: white;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 30px var(--accent-glow); }
+        .btn-danger {
+            background: linear-gradient(135deg, var(--red), #f87171);
+            color: white;
+        }
+        .btn-danger:hover { transform: translateY(-2px); }
+        .btn-success {
+            background: linear-gradient(135deg, var(--green), #34d399);
+            color: white;
+        }
+        .btn-ghost {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { background: rgba(99, 102, 241, 0.2); }
+        .btn-sm { padding: 8px 16px; font-size: 12px; border-radius: 8px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+        .btn-full { width: 100%; justify-content: center; }
+
+        /* HEADER */
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 20px 0; margin-bottom: 24px;
+        }
+        .header h1 {
+            font-size: 24px; font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), var(--cyan));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .header-badge {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+            padding: 8px 16px; border-radius: 20px;
+            font-size: 13px; font-weight: 600;
+        }
+
+        /* STATS ROW */
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px 24px;
+            backdrop-filter: blur(10px);
+        }
+        .stat-card .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .stat-card .value { font-size: 28px; font-weight: 800; }
+        .stat-card .value.cyan { color: var(--cyan); }
+        .stat-card .value.green { color: var(--green); }
+        .stat-card .value.purple { color: var(--purple); }
+        .stat-card .value.yellow { color: var(--yellow); }
+
+        /* API KEY SECTION */
+        .api-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+            display: flex; gap: 12px; align-items: center;
+        }
+        .api-section input { flex: 1; }
+
+        /* COUNTRY GRID */
+        .section-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--text-bright); }
+        .country-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .country-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        .country-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 30px rgba(99,102,241,0.15); }
+        .country-card.selected { border-color: var(--accent); background: rgba(99,102,241,0.1); box-shadow: 0 0 20px var(--accent-glow); }
+        .country-card .flag { font-size: 32px; margin-bottom: 8px; }
+        .country-card .name { font-weight: 600; font-size: 14px; }
+        .country-card .price-tag { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+        /* BUY CONTROLS */
+        .buy-controls {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .qty-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .qty-btn {
+            width: 48px; height: 48px;
+            background: rgba(99,102,241,0.1);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-weight: 700; font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+        .qty-btn:hover { background: var(--accent); color: white; }
+        .action-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+        /* AUTOBUY PANEL */
+        .autobuy-panel {
+            background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.1));
+            border: 1px solid rgba(99,102,241,0.3);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            display: none;
+        }
+        .autobuy-panel.active { display: block; animation: fadeIn 0.3s; }
+        .autobuy-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
+        .ab-stat { text-align: center; }
+        .ab-stat .ab-val { font-size: 24px; font-weight: 800; color: var(--cyan); }
+        .ab-stat .ab-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; }
+        .pulse-dot {
+            display: inline-block; width: 8px; height: 8px;
+            background: var(--green); border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* ORDERS LIST */
+        .orders-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .orders-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .order-count {
+            background: rgba(99,102,241,0.2);
+            color: var(--accent);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .order-item {
+            background: rgba(15, 15, 35, 0.6);
+            border: 1px solid rgba(99,102,241,0.1);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+            animation: slideIn 0.3s;
+        }
+        .order-item.got-otp { border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.05); }
+        .order-item.cancelled { opacity: 0.5; }
+        .order-item.timeout { opacity: 0.5; }
+        .order-left { display: flex; align-items: center; gap: 14px; }
+        .order-num { font-family: 'Inter', monospace; font-weight: 700; font-size: 16px; letter-spacing: 0.5px; }
+        .order-meta { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .order-timer { font-weight: 600; color: var(--yellow); font-size: 14px; font-variant-numeric: tabular-nums; }
+        .order-timer.expired { color: var(--red); }
+        .order-price { font-size: 12px; color: var(--text-dim); }
+        .order-otp {
+            font-family: 'Inter', monospace;
+            font-size: 18px; font-weight: 800;
+            color: var(--green);
+            background: rgba(16,185,129,0.1);
+            padding: 6px 14px;
+            border-radius: 8px;
+            letter-spacing: 2px;
+            animation: otpPop 0.4s;
+        }
+        .order-status { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+        .status-waiting { color: var(--yellow); background: rgba(245,158,11,0.1); }
+        .status-otp { color: var(--green); background: rgba(16,185,129,0.1); }
+        .status-cancel { color: var(--red); background: rgba(239,68,68,0.1); }
+        .cancel-btn {
+            background: none; border: 1px solid rgba(239,68,68,0.3);
+            color: var(--red); padding: 6px 12px; border-radius: 8px;
+            font-size: 11px; cursor: pointer; font-family: 'Inter';
+            transition: all 0.2s;
+        }
+        .cancel-btn:hover { background: rgba(239,68,68,0.1); }
+        .empty-state { text-align: center; padding: 40px; color: var(--text-dim); }
+
+        /* TOAST */
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+        .toast {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 20px;
+            margin-bottom: 8px;
+            backdrop-filter: blur(20px);
+            animation: slideIn 0.3s;
+            font-size: 13px;
+            max-width: 350px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+        .toast.success { border-color: rgba(16,185,129,0.4); }
+        .toast.error { border-color: rgba(239,68,68,0.4); }
+
+        /* ANIMATIONS */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes otpPop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* RESPONSIVE */
+        @media (max-width: 600px) {
+            .container { padding: 12px; }
+            .stats-row { grid-template-columns: 1fr 1fr; }
+            .country-grid { grid-template-columns: 1fr 1fr; }
+            .stat-card .value { font-size: 22px; }
+            .api-section { flex-direction: column; }
+            .order-item { flex-direction: column; gap: 10px; align-items: flex-start; }
+            .header h1 { font-size: 18px; }
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="login-screen">
+    <div class="login-box">
+        <h1>⚡ HeroSMS Ultra</h1>
+        <p>Web Auto Buy — Tanpa Limit Telegram</p>
+        <input type="password" id="passwordInput" placeholder="Masukkan Password" style="margin-bottom: 16px;">
+        <button class="btn btn-primary btn-full" onclick="doLogin()">🔓 Masuk</button>
+        <p id="loginError" style="color: var(--red); margin-top: 12px; font-size: 13px;"></p>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" class="container hidden">
+    <!-- Header -->
+    <div class="header">
+        <h1>⚡ HeroSMS Ultra</h1>
+        <div class="header-badge" id="balanceBadge">💰 Saldo: -</div>
+    </div>
+
+    <!-- API Key -->
+    <div class="api-section">
+        <input type="text" id="apiKeyInput" placeholder="Masukkan API Key Hero-SMS">
+        <button class="btn btn-primary" onclick="setApiKey()">Simpan</button>
+        <button class="btn btn-ghost" onclick="refreshBalance()">🔄</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="label">Total Order</div>
+            <div class="value cyan" id="statTotal">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">OTP Diterima</div>
+            <div class="value green" id="statOtp">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Menunggu</div>
+            <div class="value yellow" id="statWaiting">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Saldo (USD)</div>
+            <div class="value purple" id="statBalance">-</div>
+        </div>
+    </div>
+
+    <!-- Country Selection -->
+    <div class="section-title">🌍 Pilih Negara</div>
+    <div class="country-grid" id="countryGrid"></div>
+
+    <!-- Buy Controls -->
+    <div class="buy-controls">
+        <div class="section-title">🛒 Quick Buy — <span id="selectedCountryLabel">Pilih negara</span></div>
+        <div class="qty-row">
+            <button class="qty-btn" onclick="buyNumber(1)">1</button>
+            <button class="qty-btn" onclick="buyNumber(2)">2</button>
+            <button class="qty-btn" onclick="buyNumber(3)">3</button>
+            <button class="qty-btn" onclick="buyNumber(4)">4</button>
+            <button class="qty-btn" onclick="buyNumber(5)">5</button>
+            <button class="qty-btn" onclick="buyNumber(10)">10</button>
+        </div>
+        <div class="action-row">
+            <button class="btn btn-success" onclick="startAutobuy()" id="btnAutobuy">🚀 AUTO BUY BRUTAL</button>
+            <button class="btn btn-danger hidden" onclick="stopAutobuy()" id="btnStopAutobuy">🛑 STOP AUTO BUY</button>
+        </div>
+    </div>
+
+    <!-- Autobuy Panel -->
+    <div class="autobuy-panel" id="autobuyPanel">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <span class="pulse-dot"></span>
+            <span style="font-weight:700; font-size:16px;" id="abTitle">AUTO BUY AKTIF</span>
+        </div>
+        <div class="autobuy-stats">
+            <div class="ab-stat"><div class="ab-val" id="abAttempts">0</div><div class="ab-label">Percobaan</div></div>
+            <div class="ab-stat"><div class="ab-val" id="abFound">0</div><div class="ab-label">Dapat</div></div>
+            <div class="ab-stat"><div class="ab-val" id="abSpeed">0</div><div class="ab-label">Req/detik</div></div>
+            <div class="ab-stat"><div class="ab-val" id="abTime">0s</div><div class="ab-label">Waktu</div></div>
+        </div>
+    </div>
+
+    <!-- Orders -->
+    <div class="orders-section">
+        <div class="orders-header">
+            <div class="section-title" style="margin-bottom:0">📋 Daftar Order</div>
+            <span class="order-count" id="orderCountBadge">0 order</span>
+        </div>
+        <div id="ordersList">
+            <div class="empty-state">Belum ada order. Pilih negara dan beli nomor!</div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- AUDIO for OTP notification -->
+<audio id="otpSound" preload="auto">
+    <source src="data:audio/wav;base64,UklGRl9vT19telegramXBhdmVmbXQgEAAAABAAEARKwAAIhYAQACABAAZGF0YQ==" type="audio/wav">
+</audio>
+
+<script>
+const socket = io();
+let selectedCountry = null;
+let orders = {};
+let timerIntervals = {};
+let stats = { total: 0, otp: 0, waiting: 0 };
+let autobuyActive = false;
+
+const COUNTRIES = {
+    vietnam: { name: 'Vietnam', flag: '🇻🇳', maxPrice: '0.25' },
+    philipina: { name: 'Philipina', flag: '🇵🇭', maxPrice: '0.25' },
+    colombia: { name: 'Colombia', flag: '🇨🇴', maxPrice: '-' },
+    mexico: { name: 'Mexico', flag: '🇲🇽', maxPrice: '-' },
+    brazil: { name: 'Brazil', flag: '🇧🇷', maxPrice: '1.50' },
+};
+
+// =============================================
+// INIT
+// =============================================
+document.addEventListener('DOMContentLoaded', () => {
+    renderCountryGrid();
+    document.getElementById('passwordInput').addEventListener('keypress', e => { if(e.key==='Enter') doLogin(); });
+    document.getElementById('apiKeyInput').addEventListener('keypress', e => { if(e.key==='Enter') setApiKey(); });
+
+    // Restore API key from localStorage
+    const savedKey = localStorage.getItem('herosms_api_key');
+    if (savedKey) {
+        document.getElementById('apiKeyInput').value = savedKey;
+    }
+});
+
+function renderCountryGrid() {
+    const grid = document.getElementById('countryGrid');
+    grid.innerHTML = '';
+    for (const [key, c] of Object.entries(COUNTRIES)) {
+        const card = document.createElement('div');
+        card.className = 'country-card';
+        card.id = `country_${key}`;
+        card.onclick = () => selectCountry(key);
+        card.innerHTML = `
+            <div class="flag">${c.flag}</div>
+            <div class="name">${c.name}</div>
+            <div class="price-tag">Max: ${c.maxPrice} USD</div>
+        `;
+        grid.appendChild(card);
+    }
+}
+
+function selectCountry(key) {
+    selectedCountry = key;
+    document.querySelectorAll('.country-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById(`country_${key}`).classList.add('selected');
+    document.getElementById('selectedCountryLabel').textContent = `${COUNTRIES[key].flag} ${COUNTRIES[key].name}`;
+}
+
+// =============================================
+// LOGIN
+// =============================================
+function doLogin() {
+    const pw = document.getElementById('passwordInput').value;
+    socket.emit('login', { password: pw });
+}
+socket.on('login_result', data => {
+    if (data.success) {
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainApp').classList.remove('hidden');
+        // Auto set API key if saved
+        const savedKey = localStorage.getItem('herosms_api_key');
+        if (savedKey) { setApiKey(); }
+    } else {
+        document.getElementById('loginError').textContent = data.message;
+    }
+});
+
+// =============================================
+// API KEY
+// =============================================
+function setApiKey() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    if (!key) return;
+    localStorage.setItem('herosms_api_key', key);
+    socket.emit('set_api_key', { api_key: key });
+}
+socket.on('api_result', data => {
+    if (data.success) {
+        showToast(`✅ API Key valid! Saldo: ${data.balance} USD`, 'success');
+        updateBalance(data.balance);
+    } else {
+        showToast(`❌ ${data.message}`, 'error');
+    }
+});
+
+function refreshBalance() {
+    socket.emit('get_balance');
+}
+socket.on('balance_update', data => {
+    updateBalance(data.balance);
+});
+function updateBalance(bal) {
+    document.getElementById('balanceBadge').textContent = `💰 Saldo: ${bal} USD`;
+    document.getElementById('statBalance').textContent = bal;
+}
+
+// =============================================
+// BUY NUMBER
+// =============================================
+function buyNumber(count) {
+    if (!selectedCountry) { showToast('⚠️ Pilih negara dulu!', 'error'); return; }
+    socket.emit('buy_number', { country: selectedCountry, count: count });
+    showToast(`⏳ Membeli ${count} nomor ${COUNTRIES[selectedCountry].name}...`);
+}
+
+// =============================================
+// AUTO BUY
+// =============================================
+function startAutobuy() {
+    if (!selectedCountry) { showToast('⚠️ Pilih negara dulu!', 'error'); return; }
+    socket.emit('start_autobuy', { country: selectedCountry });
+}
+function stopAutobuy() {
+    socket.emit('stop_autobuy');
+}
+socket.on('autobuy_started', data => {
+    autobuyActive = true;
+    document.getElementById('btnAutobuy').classList.add('hidden');
+    document.getElementById('btnStopAutobuy').classList.remove('hidden');
+    document.getElementById('autobuyPanel').classList.add('active');
+    document.getElementById('abTitle').textContent = `AUTO BUY ${data.country_name.toUpperCase()} (Max: ${data.maxPrice} USD)`;
+    showToast(`🚀 Auto Buy ${data.country_name} dimulai!`, 'success');
+});
+socket.on('autobuy_stats', data => {
+    document.getElementById('abAttempts').textContent = data.attempts.toLocaleString();
+    document.getElementById('abFound').textContent = data.found;
+    document.getElementById('abSpeed').textContent = data.speed;
+    const el = data.elapsed;
+    document.getElementById('abTime').textContent = `${Math.floor(el/60)}m ${el%60}s`;
+});
+socket.on('autobuy_stopped', data => {
+    autobuyActive = false;
+    document.getElementById('btnAutobuy').classList.remove('hidden');
+    document.getElementById('btnStopAutobuy').classList.add('hidden');
+    document.getElementById('autobuyPanel').classList.remove('active');
+    showToast(`🛑 Auto Buy selesai — ${data.total} nomor, ${data.attempts || '-'} percobaan`);
+});
+
+// =============================================
+// ORDER MANAGEMENT
+// =============================================
+socket.on('new_number', data => {
+    const id = data.id;
+    orders[id] = data;
+    stats.total++;
+    stats.waiting++;
+    updateStats();
+    renderOrder(data);
+    startTimer(id, data.order_time);
+    updateOrderCount();
+});
+
+socket.on('order_update', data => {
+    const id = data.id;
+    if (orders[id]) {
+        orders[id].status = data.status;
+        if (data.code) orders[id].code = data.code;
+    }
+
+    const el = document.getElementById(`order_${id}`);
+    if (!el) return;
+
+    if (data.status === 'got_otp') {
+        stats.otp++;
+        stats.waiting = Math.max(0, stats.waiting - 1);
+        el.classList.add('got-otp');
+        const metaEl = el.querySelector('.order-meta');
+        metaEl.innerHTML = `<span class="order-otp">${data.code || '???'}</span><span class="order-status status-otp">✅ OTP</span>`;
+        stopTimer(id);
+        playOtpSound();
+        showToast(`🎉 OTP diterima: ${data.code}`, 'success');
+    } else if (data.status === 'cancelled') {
+        stats.waiting = Math.max(0, stats.waiting - 1);
+        el.classList.add('cancelled');
+        const metaEl = el.querySelector('.order-meta');
+        metaEl.innerHTML = `<span class="order-status status-cancel">🚫 Dibatalkan</span>`;
+        stopTimer(id);
+    } else if (data.status === 'timeout') {
+        stats.waiting = Math.max(0, stats.waiting - 1);
+        el.classList.add('timeout');
+        const metaEl = el.querySelector('.order-meta');
+        metaEl.innerHTML = `<span class="order-status status-cancel">⏰ Expired</span>`;
+        stopTimer(id);
+    }
+    updateStats();
+});
+
+socket.on('buy_complete', data => {
+    showToast(`✅ Selesai beli ${data.count} nomor ${data.country}`, 'success');
+});
+
+socket.on('buy_status', data => {
+    showToast(`⏳ ${data.message}`);
+});
+
+socket.on('error_msg', data => {
+    showToast(`❌ ${data.message}`, 'error');
+});
+
+function renderOrder(data) {
+    const list = document.getElementById('ordersList');
+    // Remove empty state
+    const emptyState = list.querySelector('.empty-state');
+    if (emptyState) emptyState.remove();
+
+    const cc = data.country_code || '';
+    const localNum = data.number.startsWith(cc) ? data.number.slice(cc.length) : data.number;
+    const priceStr = data.price ? `${data.price} USD` : '-';
+
+    const div = document.createElement('div');
+    div.className = 'order-item';
+    div.id = `order_${data.id}`;
+    div.innerHTML = `
+        <div class="order-left">
+            <span style="font-size:20px">${COUNTRIES[data.country]?.flag || '🌍'}</span>
+            <div>
+                <div class="order-num">${localNum}</div>
+                <div class="order-price">💰 ${priceStr} · #${data.index || stats.total}</div>
+            </div>
+        </div>
+        <div class="order-meta">
+            <span class="order-timer" id="timer_${data.id}">20:00</span>
+            <span class="order-status status-waiting">⏳ Menunggu</span>
+            <button class="cancel-btn" onclick="cancelOrder('${data.id}')">✕ Cancel</button>
+        </div>
+    `;
+    list.prepend(div);
+}
+
+// =============================================
+// TIMER (CLIENT-SIDE - NEVER STUCK!)
+// =============================================
+function startTimer(id, orderTime) {
+    const OTP_TIMEOUT = 1200; // 20 min
+    timerIntervals[id] = setInterval(() => {
+        const now = Date.now() / 1000;
+        const elapsed = now - orderTime;
+        const remaining = Math.max(0, OTP_TIMEOUT - elapsed);
+
+        const mins = Math.floor(remaining / 60);
+        const secs = Math.floor(remaining % 60);
+        const timerEl = document.getElementById(`timer_${id}`);
+        if (timerEl) {
+            timerEl.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+            if (remaining <= 60) timerEl.classList.add('expired');
+        }
+
+        if (remaining <= 0) {
+            stopTimer(id);
+        }
+    }, 1000);
+}
+
+function stopTimer(id) {
+    if (timerIntervals[id]) {
+        clearInterval(timerIntervals[id]);
+        delete timerIntervals[id];
+    }
+}
+
+function cancelOrder(id) {
+    socket.emit('cancel_order', { id: id });
+}
+
+// =============================================
+// HELPERS
+// =============================================
+function updateStats() {
+    document.getElementById('statTotal').textContent = stats.total;
+    document.getElementById('statOtp').textContent = stats.otp;
+    document.getElementById('statWaiting').textContent = stats.waiting;
+}
+
+function updateOrderCount() {
+    document.getElementById('orderCountBadge').textContent = `${Object.keys(orders).length} order`;
+}
+
+function showToast(message, type = '') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);
+}
+
+function playOtpSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        osc.type = 'sine';
+        gain.gain.value = 0.3;
+        osc.start(); osc.stop(ctx.currentTime + 0.15);
+        setTimeout(() => {
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.connect(gain2); gain2.connect(ctx.destination);
+            osc2.frequency.value = 1100;
+            gain2.gain.value = 0.3;
+            osc2.start(); osc2.stop(ctx.currentTime + 0.2);
+        }, 150);
+    } catch(e) {}
+}
+</script>
+
+</body>
+</html>

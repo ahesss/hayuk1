@@ -8,12 +8,12 @@ import json
 import string
 import random
 import requests
-from flask import Flask, render_template, request, jsonify, abort
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit, join_room
 
 # INIT
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_ultimate_v13")
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_ultimate_v13_secret")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # CONFIG
@@ -22,7 +22,7 @@ MASTER_PASS = str(os.environ.get("ACCESS_PASSWORD", "admin123")).strip()
 ADMIN_SECRET = str(os.environ.get("ADMIN_SECRET", "panel8899")).strip()
 CODES_FILE = "codes.json"
 
-print(f"\n[BOOT] HERO-SMS WEB V13 (ACCESS CODE SYSTEM) ONLINE")
+print(f"\n[BOOT] HERO-SMS WEB V14 (HTTP AUTH) ONLINE")
 print(f"[BOOT] Admin Panel: /admin/{ADMIN_SECRET}")
 sys.stdout.flush()
 
@@ -34,7 +34,6 @@ COUNTRIES = {
     "brazil": {"name": "Brazil", "flag": "\U0001f1e7\U0001f1f7", "id": "73", "code": "55", "max": "1.50"},
 }
 
-# State Management
 autobuy_active = {}
 
 # Connection pooling
@@ -44,7 +43,7 @@ http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
 
 # =============================================
-# KODE AKSES (ACCESS CODE SYSTEM)
+# KODE AKSES
 # =============================================
 def load_codes():
     if os.path.exists(CODES_FILE):
@@ -55,8 +54,11 @@ def load_codes():
     return {}
 
 def save_codes(codes):
-    with open(CODES_FILE, 'w') as f:
-        json.dump(codes, f, indent=2)
+    try:
+        with open(CODES_FILE, 'w') as f:
+            json.dump(codes, f, indent=2)
+    except Exception as e:
+        print(f"[ERROR] Gagal simpan codes.json: {e}")
 
 def generate_code():
     chars = string.ascii_uppercase + string.digits
@@ -76,19 +78,59 @@ def api_req(key, action, **kwargs):
     except: return "ERR_HTTP"
 
 # =============================================
-# ROUTES
+# LOGIN VIA HTTP (BUKAN SOCKETIO!)
 # =============================================
 @app.route('/')
 def home():
-    return render_template('index.html', countries=COUNTRIES)
+    if session.get('authenticated'):
+        return render_template('index.html', countries=COUNTRIES, logged_in=True)
+    return render_template('index.html', countries=COUNTRIES, logged_in=False)
 
+@app.route('/login', methods=['POST'])
+def login():
+    code = request.form.get('code', '').strip().upper()
+    print(f"[AUTH] Login attempt: '{code}' | Codes in memory: {len(access_codes)}")
+    
+    # Reload dari file juga
+    global access_codes
+    access_codes = load_codes()
+    print(f"[AUTH] After reload: {len(access_codes)} codes | Keys: {list(access_codes.keys())}")
+    sys.stdout.flush()
+    
+    if code in access_codes:
+        if access_codes[code]['status'] == 'available':
+            access_codes[code]['status'] = 'used'
+            access_codes[code]['used_at'] = time.time()
+            access_codes[code]['used_str'] = time.strftime('%Y-%m-%d %H:%M:%S')
+            save_codes(access_codes)
+            session['authenticated'] = True
+            session['access_code'] = code
+            print(f"[AUTH] ✅ Code {code} BERHASIL!")
+            sys.stdout.flush()
+            return jsonify({'success': True})
+        elif access_codes[code]['status'] == 'used':
+            session['authenticated'] = True
+            session['access_code'] = code
+            print(f"[AUTH] ✅ Code {code} re-login OK!")
+            sys.stdout.flush()
+            return jsonify({'success': True})
+    
+    print(f"[AUTH] ❌ Code {code} DITOLAK!")
+    sys.stdout.flush()
+    return jsonify({'success': False, 'error': 'Kode tidak valid atau sudah dipakai orang lain'})
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
+# =============================================
+# ADMIN
+# =============================================
 @app.route(f'/admin/{ADMIN_SECRET}')
 def admin_page():
     return render_template('admin.html')
 
-# =============================================
-# ADMIN API (REST)
-# =============================================
 @app.route(f'/api/admin/{ADMIN_SECRET}/verify', methods=['POST'])
 def admin_verify():
     data = request.get_json()
@@ -101,14 +143,18 @@ def admin_list_codes():
     pw = request.args.get('pw', '')
     if pw != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
+    global access_codes
+    access_codes = load_codes()
     return jsonify(access_codes)
 
 @app.route(f'/api/admin/{ADMIN_SECRET}/generate', methods=['POST'])
 def admin_generate():
+    global access_codes
     data = request.get_json()
     if not data or data.get('password') != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
     count = min(int(data.get('count', 1)), 50)
+    access_codes = load_codes()
     new_codes = []
     for _ in range(count):
         code = generate_code()
@@ -121,14 +167,18 @@ def admin_generate():
         }
         new_codes.append(code)
     save_codes(access_codes)
+    print(f"[ADMIN] Generated {len(new_codes)} codes. Total: {len(access_codes)}")
+    sys.stdout.flush()
     return jsonify({'codes': new_codes})
 
 @app.route(f'/api/admin/{ADMIN_SECRET}/delete', methods=['POST'])
 def admin_delete():
+    global access_codes
     data = request.get_json()
     if not data or data.get('password') != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
     code = data.get('code')
+    access_codes = load_codes()
     if code in access_codes:
         del access_codes[code]
         save_codes(access_codes)
@@ -136,44 +186,15 @@ def admin_delete():
     return jsonify({'error': 'not found'}), 404
 
 # =============================================
-# SOCKET EVENTS
+# SOCKET EVENTS (TANPA AUTH - auth sudah via HTTP)
 # =============================================
 @socketio.on('init_session')
 def on_init(data):
     key = data.get('api_key')
     if key:
         join_room(key)
-        print(f"[SESSION] User linked to API Key: {key[:8]}...")
-        sys.stdout.flush()
         if autobuy_active.get(key):
             emit('autobuy_started', {'country_name': 'Berjalan'})
-
-@socketio.on('check_auth')
-def on_check(data):
-    global access_codes
-    # SELALU reload dari file agar sinkron dengan kode yang di-generate admin
-    access_codes = load_codes()
-    code = str(data.get('password', '')).strip().upper()
-    print(f"[AUTH] Kode masuk: '{code}' | Total kode tersedia: {len(access_codes)}")
-    sys.stdout.flush()
-    # Cek apakah kode valid dan belum dipakai
-    if code in access_codes and access_codes[code]['status'] == 'available':
-        access_codes[code]['status'] = 'used'
-        access_codes[code]['used_at'] = time.time()
-        access_codes[code]['used_str'] = time.strftime('%Y-%m-%d %H:%M:%S')
-        save_codes(access_codes)
-        emit('auth_result', {'success': True, 'code': code})
-        print(f"[AUTH] ✅ Code {code} BERHASIL dipakai!")
-        sys.stdout.flush()
-    elif code in access_codes and access_codes[code]['status'] == 'used':
-        # Kode sudah pernah dipakai — izinkan re-login dari browser yang sama
-        emit('auth_result', {'success': True, 'code': code})
-        print(f"[AUTH] ✅ Code {code} re-login (sudah dipakai sebelumnya)")
-        sys.stdout.flush()
-    else:
-        emit('auth_result', {'success': False})
-        print(f"[AUTH] ❌ Code {code} DITOLAK! Kode tidak ditemukan.")
-        sys.stdout.flush()
 
 @socketio.on('get_balance')
 def on_bal(data):

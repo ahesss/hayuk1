@@ -13,7 +13,14 @@ from flask_socketio import SocketIO, emit, join_room
 
 # INIT
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_ultimate_v13_secret")
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_ultimate_v16_secret_key_persistent")
+# SESSION CONFIG - PENTING untuk Railway HTTPS!
+app.config['SESSION_COOKIE_SECURE'] = True      # Required for HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 30  # 30 hari
+
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # CONFIG
@@ -21,7 +28,7 @@ API_BASE = "https://hero-sms.com/stubs/handler_api.php"
 MASTER_PASS = str(os.environ.get("ACCESS_PASSWORD", "admin123")).strip()
 ADMIN_SECRET = str(os.environ.get("ADMIN_SECRET", "panel8899")).strip()
 
-print(f"\n[BOOT] HERO-SMS WEB V16 (IN-MEMORY CODES) ONLINE")
+print(f"\n[BOOT] HERO-SMS WEB V17 (SESSION FIX + SINGLE-USE) ONLINE")
 print(f"[BOOT] Admin Panel: /admin/{ADMIN_SECRET}")
 sys.stdout.flush()
 
@@ -42,10 +49,7 @@ http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
 
 # =============================================
-# IN-MEMORY CODE STORE (NO FILE!)
-# Ini fix utama - karena Railway punya 2 service
-# yang masing-masing punya filesystem sendiri,
-# kita simpan semuanya di memory instance ini.
+# IN-MEMORY CODE STORE
 # =============================================
 access_codes = {}
 
@@ -69,11 +73,14 @@ def api_req(key, action, **kwargs):
         return "ERR_HTTP"
 
 # =============================================
-# LOGIN VIA HTTP
+# LOGIN VIA HTTP - SESSION PERSISTENT!
 # =============================================
 @app.route('/')
 def home():
+    # Cek session - jika sudah authenticated, langsung masuk dashboard
     if session.get('authenticated'):
+        print(f"[HOME] User authenticated via session cookie (code: {session.get('access_code', '?')})")
+        sys.stdout.flush()
         return render_template('index.html', countries=COUNTRIES, logged_in=True)
     return render_template('index.html', countries=COUNTRIES, logged_in=False)
 
@@ -94,21 +101,26 @@ def login():
     code_info = access_codes[code]
     
     if code_info['status'] == 'available':
+        # Kode baru - PERTAMA KALI DIPAKAI
         access_codes[code]['status'] = 'used'
         access_codes[code]['used_at'] = time.time()
         access_codes[code]['used_str'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Set session PERMANENT agar survive refresh
+        session.permanent = True
         session['authenticated'] = True
         session['access_code'] = code
-        print(f"[AUTH] ✅ Code {code} BERHASIL LOGIN!")
+        session['login_time'] = time.time()
+        
+        print(f"[AUTH] ✅ Code {code} PERTAMA KALI DIPAKAI - BERHASIL!")
         sys.stdout.flush()
         return jsonify({'success': True})
     
     elif code_info['status'] == 'used':
-        session['authenticated'] = True
-        session['access_code'] = code
-        print(f"[AUTH] ✅ Code {code} RE-LOGIN OK!")
+        # Kode SUDAH TERPAKAI - TOLAK! (sekali pakai)
+        print(f"[AUTH] ❌ Code {code} SUDAH TERPAKAI oleh orang lain!")
         sys.stdout.flush()
-        return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Kode sudah dipakai! Minta kode baru ke admin.'})
     
     return jsonify({'success': False, 'error': 'Kode tidak valid'})
 
@@ -136,8 +148,6 @@ def admin_list_codes():
     pw = request.args.get('pw', '')
     if pw != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
-    print(f"[ADMIN] List codes: {len(access_codes)} total")
-    sys.stdout.flush()
     return jsonify(access_codes)
 
 @app.route(f'/api/admin/{ADMIN_SECRET}/generate', methods=['POST'])
@@ -160,10 +170,8 @@ def admin_generate():
         }
         new_codes.append(code)
     
-    print(f"[ADMIN] ✅ Generated {len(new_codes)} codes. Total in memory: {len(access_codes)}")
-    print(f"[ADMIN] All codes: {list(access_codes.keys())}")
+    print(f"[ADMIN] ✅ Generated {len(new_codes)} codes. Total: {len(access_codes)}")
     sys.stdout.flush()
-    
     return jsonify({'codes': new_codes, 'total': len(access_codes)})
 
 @app.route(f'/api/admin/{ADMIN_SECRET}/delete', methods=['POST'])
@@ -178,29 +186,22 @@ def admin_delete():
         return jsonify({'success': True})
     return jsonify({'error': 'not found'}), 404
 
-# =============================================
-# BULK IMPORT/EXPORT (untuk backup/restore setelah deploy)
-# =============================================
-@app.route(f'/api/admin/{ADMIN_SECRET}/export', methods=['GET'])
-def admin_export():
-    pw = request.args.get('pw', '')
-    if pw != MASTER_PASS:
-        return jsonify({'error': 'unauthorized'}), 401
-    return jsonify({'codes': access_codes, 'exported_at': time.strftime('%Y-%m-%d %H:%M:%S')})
-
-@app.route(f'/api/admin/{ADMIN_SECRET}/import', methods=['POST'])
-def admin_import():
+@app.route(f'/api/admin/{ADMIN_SECRET}/reset', methods=['POST'])
+def admin_reset_code():
+    """Reset kode yang sudah terpakai jadi available lagi"""
     global access_codes
     data = request.get_json()
     if not data or data.get('password') != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
-    codes_data = data.get('codes', {})
-    if codes_data:
-        access_codes.update(codes_data)
-        print(f"[ADMIN] Imported {len(codes_data)} codes. Total: {len(access_codes)}")
-        sys.stdout.flush()
-        return jsonify({'success': True, 'total': len(access_codes)})
-    return jsonify({'error': 'no codes data'}), 400
+    code = data.get('code')
+    if code in access_codes:
+        access_codes[code]['status'] = 'available'
+        if 'used_at' in access_codes[code]:
+            del access_codes[code]['used_at']
+        if 'used_str' in access_codes[code]:
+            del access_codes[code]['used_str']
+        return jsonify({'success': True})
+    return jsonify({'error': 'not found'}), 404
 
 # =============================================
 # DEBUG
@@ -215,14 +216,19 @@ def admin_debug():
     used = sum(1 for c in access_codes.values() if c.get('status') == 'used')
     
     return jsonify({
-        'storage': 'IN_MEMORY (no file)',
+        'version': 'V17',
+        'storage': 'IN_MEMORY',
         'total_codes': len(access_codes),
         'available': available,
         'used': used,
-        'codes_list': list(access_codes.keys()),
+        'codes_detail': {k: v.get('status') for k, v in access_codes.items()},
         'server_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'instance_id': id(access_codes),
         'pid': os.getpid(),
+        'session_config': {
+            'cookie_secure': app.config.get('SESSION_COOKIE_SECURE'),
+            'cookie_samesite': app.config.get('SESSION_COOKIE_SAMESITE'),
+            'permanent_lifetime': app.config.get('PERMANENT_SESSION_LIFETIME'),
+        }
     })
 
 # =============================================

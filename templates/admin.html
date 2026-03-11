@@ -28,6 +28,7 @@
         .btn-success { background: linear-gradient(135deg, var(--green), #34d399); color: white; }
         .btn-danger { background: linear-gradient(135deg, var(--red), #f87171); color: white; }
         .btn-warning { background: linear-gradient(135deg, var(--yellow), #fbbf24); color: #1a1a2e; }
+        .btn-cyan { background: linear-gradient(135deg, var(--cyan), #22d3ee); color: #1a1a2e; }
         .btn-sm { padding: 8px 16px; font-size: 12px; }
         .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 20px; backdrop-filter: blur(20px); }
         .login-screen { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
@@ -49,8 +50,7 @@
         .sync-ok { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
         .sync-error { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
         .sync-loading { background: rgba(99,102,241,0.15); color: var(--accent); border: 1px solid rgba(99,102,241,0.3); }
-        .info-box { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 14px; margin-bottom: 20px; font-size: 13px; color: var(--accent); }
-        .debug-box { background: rgba(6,182,212,0.1); border: 1px solid var(--cyan); border-radius: 12px; padding: 16px; margin-top: 16px; font-size: 12px; font-family: 'Courier New', monospace; color: var(--cyan); white-space: pre-wrap; word-break: break-all; }
+        .info-box { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 14px; margin-bottom: 20px; font-size: 13px; color: var(--accent); line-height: 1.6; }
     </style>
 </head>
 <body>
@@ -58,15 +58,15 @@
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
         <h1 style="margin-bottom:8px;">🔐 Admin Panel</h1>
-        <p style="margin-bottom:24px; color:var(--text-dim)">HeroSMS Access Code Manager</p>
+        <p style="margin-bottom:24px; color:var(--text-dim)">HeroSMS V17 — Code Manager</p>
         <input type="password" id="adminPass" placeholder="Password Admin">
         <button class="btn btn-primary" style="width:100%" onclick="adminLogin()">Masuk</button>
     </div>
 </div>
 
 <div id="adminApp" class="container hidden">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-        <h1 style="font-size:22px;">🔐 Admin Panel V16</h1>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:8px;">
+        <h1 style="font-size:22px;">🔐 Admin V17</h1>
         <div style="display:flex; gap:8px; align-items:center;">
             <span id="syncStatus" class="sync-indicator sync-loading">⏳ Loading...</span>
             <button class="btn btn-danger btn-sm" onclick="location.href='/'">← Kembali</button>
@@ -74,7 +74,10 @@
     </div>
 
     <div class="info-box">
-        💡 <b>V16 IN-MEMORY</b> — Kode disimpan di memory server. Generate kode di sini, lalu user login di halaman utama <b>URL yang sama</b>. Kode hilang jika service di-restart.
+        💡 <b>V17 — Kode Sekali Pakai</b><br>
+        • Setiap kode hanya bisa dipakai <b>1x di 1 browser</b><br>
+        • User yang sudah login bisa refresh tanpa masalah<br>
+        • Klik 🔄 Reset untuk mengaktifkan ulang kode yang sudah terpakai
     </div>
 
     <div class="stats-row">
@@ -107,17 +110,9 @@
     <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h3>📋 Semua Kode Akses</h3>
-            <div style="display:flex; gap:8px;">
-                <button class="btn btn-sm btn-warning" onclick="runDebug()">🔍 Debug</button>
-                <button class="btn btn-sm btn-primary" onclick="refreshCodes()">🔄 Refresh</button>
-            </div>
+            <button class="btn btn-sm btn-primary" onclick="refreshCodes()">🔄 Refresh</button>
         </div>
         <div id="codesList"></div>
-    </div>
-
-    <div id="debugSection" class="card hidden">
-        <h3 style="margin-bottom:12px; color:var(--cyan);">🔍 Debug Info</h3>
-        <div id="debugInfo" class="debug-box">Loading...</div>
     </div>
 </div>
 
@@ -150,6 +145,8 @@
         .catch(e => alert('Koneksi gagal: ' + e.message));
     }
 
+    document.getElementById('adminPass').addEventListener('keypress', e => { if(e.key==='Enter') adminLogin(); });
+
     function setSyncStatus(status, text) {
         const el = document.getElementById('syncStatus');
         el.className = 'sync-indicator sync-' + status;
@@ -166,11 +163,9 @@
         .then(codes => {
             allCodes = codes;
             renderCodes(codes);
-            setSyncStatus('ok', '✅ Memory (' + Object.keys(codes).length + ' kode)');
+            setSyncStatus('ok', '✅ OK (' + Object.keys(codes).length + ')');
         })
-        .catch(e => {
-            setSyncStatus('error', '❌ Error: ' + e.message);
-        });
+        .catch(e => setSyncStatus('error', '❌ ' + e.message));
     }
 
     function renderCodes(codes) {
@@ -194,17 +189,25 @@
             const isAvail = info.status === 'available';
             const statusBadge = isAvail
                 ? '<span class="badge badge-green">✅ Tersedia</span>'
-                : `<span class="badge badge-red">🚫 Terpakai</span>`;
+                : '<span class="badge badge-red">🔒 Terpakai</span>';
             const timeInfo = isAvail
                 ? `<span style="font-size:11px; color:var(--text-dim);">Dibuat: ${info.created_str || '-'}</span>`
                 : `<span style="font-size:11px; color:var(--text-dim);">Dipakai: ${info.used_str || '-'}</span>`;
+            
+            const resetBtn = !isAvail 
+                ? `<button class="btn btn-cyan btn-sm" style="margin-right:6px;" onclick="resetCode('${code}')">🔄</button>` 
+                : '';
+            
             return `
                 <div class="code-item">
                     <div>
                         <span class="code-text ${isAvail ? 'code-available' : 'code-used'}" onclick="copyCode('${code}')">${code}</span>
                         <div style="margin-top:4px;">${statusBadge} ${timeInfo}</div>
                     </div>
-                    <button class="btn btn-danger btn-sm" onclick="deleteCode('${code}')">🗑️</button>
+                    <div style="display:flex; gap:4px;">
+                        ${resetBtn}
+                        <button class="btn btn-danger btn-sm" onclick="deleteCode('${code}')">🗑️</button>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -214,31 +217,25 @@
         const count = document.getElementById('codeCount').value;
         const btn = document.getElementById('btnGenerate');
         btn.disabled = true;
-        btn.innerText = '⏳ Generating...';
+        btn.innerText = '⏳ ...';
         
         fetch(API_BASE + '/generate', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({password: adminPw, count: parseInt(count)})
         })
-        .then(r => {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-        })
+        .then(r => r.json())
         .then(d => {
             if (d.codes) {
                 lastNewCodes = d.codes;
                 document.getElementById('newCodes').classList.remove('hidden');
                 document.getElementById('newCodesList').innerText = d.codes.join('\n');
-                toast(`🎫 ${d.codes.length} kode dibuat! Total: ${d.total}`);
+                toast(`🎫 ${d.codes.length} kode dibuat!`);
                 refreshCodes();
             }
         })
-        .catch(e => toast('❌ Error: ' + e.message))
-        .finally(() => {
-            btn.disabled = false;
-            btn.innerText = '🎫 Generate!';
-        });
+        .catch(e => toast('❌ ' + e.message))
+        .finally(() => { btn.disabled = false; btn.innerText = '🎫 Generate!'; });
     }
 
     function deleteCode(code) {
@@ -249,30 +246,28 @@
             body: JSON.stringify({password: adminPw, code: code})
         })
         .then(r => r.json())
-        .then(d => {
-            if (d.success) { toast('🗑️ Dihapus!'); refreshCodes(); }
-        });
+        .then(d => { if (d.success) { toast('🗑️ Dihapus!'); refreshCodes(); } });
     }
 
-    function runDebug() {
-        const section = document.getElementById('debugSection');
-        const info = document.getElementById('debugInfo');
-        section.classList.remove('hidden');
-        info.innerText = 'Loading...';
-        fetch(API_BASE + '/debug?pw=' + encodeURIComponent(adminPw))
+    function resetCode(code) {
+        if (!confirm(`Reset kode ${code} jadi tersedia lagi?`)) return;
+        fetch(API_BASE + '/reset', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: adminPw, code: code})
+        })
         .then(r => r.json())
-        .then(d => { info.innerText = JSON.stringify(d, null, 2); })
-        .catch(e => { info.innerText = 'Error: ' + e.message; });
+        .then(d => { if (d.success) { toast('🔄 Kode di-reset!'); refreshCodes(); } });
     }
 
     function copyCode(code) {
         navigator.clipboard.writeText(code);
-        toast(`📋 Copied: ${code}`);
+        toast('📋 Copied: ' + code);
     }
 
     function copyAllNew() {
         navigator.clipboard.writeText(lastNewCodes.join('\n'));
-        toast(`📋 ${lastNewCodes.length} kode di-copy!`);
+        toast('📋 ' + lastNewCodes.length + ' kode di-copy!');
     }
 
     function toast(m) {
@@ -283,7 +278,6 @@
         setTimeout(() => x.remove(), 3000);
     }
 
-    // Auto-refresh every 10s
     setInterval(() => {
         if (!document.getElementById('adminApp').classList.contains('hidden')) refreshCodes();
     }, 10000);

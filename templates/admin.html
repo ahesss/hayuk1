@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HeroSMS — Admin Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a1a;
+            --bg-card: rgba(22, 22, 50, 0.8);
+            --border: rgba(99, 102, 241, 0.2);
+            --accent: #6366f1;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --cyan: #06b6d4;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --text-bright: #f8fafc;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text); min-height: 100vh; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        input, select { width: 100%; padding: 14px 18px; background: rgba(15, 15, 35, 0.8); border: 1px solid var(--border); border-radius: 12px; color: var(--text-bright); outline: none; margin-bottom: 16px; font-family: 'Inter', sans-serif; }
+        .btn { padding: 14px 28px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; justify-content: center; font-family: 'Inter', sans-serif; font-size: 14px; }
+        .btn-primary { background: linear-gradient(135deg, var(--accent), #818cf8); color: white; }
+        .btn-success { background: linear-gradient(135deg, var(--green), #34d399); color: white; }
+        .btn-danger { background: linear-gradient(135deg, var(--red), #f87171); color: white; }
+        .btn-sm { padding: 8px 16px; font-size: 12px; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 20px; backdrop-filter: blur(20px); }
+        .login-screen { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 40px; width: 100%; max-width: 400px; backdrop-filter: blur(20px); text-align: center; }
+        .code-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(15, 15, 35, 0.6); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
+        .code-text { font-family: 'Courier New', monospace; font-weight: 900; font-size: 16px; letter-spacing: 2px; cursor: pointer; }
+        .code-available { color: var(--green); }
+        .code-used { color: var(--red); opacity: 0.6; }
+        .badge { padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+        .badge-green { background: rgba(16,185,129,0.2); color: var(--green); }
+        .badge-red { background: rgba(239,68,68,0.2); color: var(--red); }
+        .hidden { display: none !important; }
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stat-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 15px; text-align: center; }
+        .toast-box { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { background: var(--bg-card); padding: 12px 24px; border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 8px; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen">
+    <div class="login-box">
+        <h1 style="margin-bottom:8px;">🔐 Admin Panel</h1>
+        <p style="margin-bottom:24px; color:var(--text-dim)">HeroSMS Access Code Manager</p>
+        <input type="password" id="adminPass" placeholder="Password Admin">
+        <button class="btn btn-primary" style="width:100%" onclick="adminLogin()">Masuk</button>
+    </div>
+</div>
+
+<div id="adminApp" class="container hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+        <h1 style="font-size:22px;">🔐 Admin — Kelola Kode Akses</h1>
+        <button class="btn btn-danger btn-sm" onclick="location.href='/'">← Kembali</button>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-box">Total<br><b id="statTotal" style="font-size:22px; color:var(--cyan);">0</b></div>
+        <div class="stat-box" style="color:var(--green)">Tersedia<br><b id="statAvail" style="font-size:22px;">0</b></div>
+        <div class="stat-box" style="color:var(--red)">Terpakai<br><b id="statUsed" style="font-size:22px;">0</b></div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-bottom:16px;">🎫 Generate Kode Baru</h3>
+        <div style="display:flex; gap:10px;">
+            <select id="codeCount" style="margin-bottom:0; max-width:120px;">
+                <option value="1">1 Kode</option>
+                <option value="3">3 Kode</option>
+                <option value="5" selected>5 Kode</option>
+                <option value="10">10 Kode</option>
+                <option value="20">20 Kode</option>
+            </select>
+            <button class="btn btn-success" style="flex:1" onclick="generateCodes()">🎫 Generate!</button>
+        </div>
+        <div id="newCodes" class="hidden" style="margin-top:16px; padding:16px; background:rgba(16,185,129,0.1); border:1px solid var(--green); border-radius:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <b style="color:var(--green);">Kode Baru:</b>
+                <button class="btn btn-sm btn-primary" onclick="copyAllNew()">📋 Copy Semua</button>
+            </div>
+            <pre id="newCodesList" style="color:var(--green); font-size:14px; line-height:2;"></pre>
+        </div>
+    </div>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3>📋 Semua Kode Akses</h3>
+            <button class="btn btn-sm btn-primary" onclick="refreshCodes()">🔄 Refresh</button>
+        </div>
+        <div id="codesList"></div>
+    </div>
+</div>
+
+<div class="toast-box" id="tBox"></div>
+
+<script>
+    const ADMIN_PATH = window.location.pathname;
+    const API_BASE = ADMIN_PATH.replace('/admin/', '/api/admin/');
+    let adminPw = '';
+    let allCodes = {};
+    let lastNewCodes = [];
+
+    function adminLogin() {
+        adminPw = document.getElementById('adminPass').value;
+        fetch(API_BASE + '/verify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: adminPw})
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('adminApp').classList.remove('hidden');
+                refreshCodes();
+            } else {
+                alert('Password salah!');
+            }
+        });
+    }
+
+    function refreshCodes() {
+        fetch(API_BASE + '/codes?pw=' + encodeURIComponent(adminPw))
+        .then(r => r.json())
+        .then(codes => {
+            allCodes = codes;
+            renderCodes(codes);
+        });
+    }
+
+    function renderCodes(codes) {
+        const list = document.getElementById('codesList');
+        const entries = Object.entries(codes).sort((a, b) => (b[1].created || 0) - (a[1].created || 0));
+        
+        let totalCount = entries.length;
+        let availCount = entries.filter(([k, v]) => v.status === 'available').length;
+        let usedCount = entries.filter(([k, v]) => v.status === 'used').length;
+        
+        document.getElementById('statTotal').innerText = totalCount;
+        document.getElementById('statAvail').innerText = availCount;
+        document.getElementById('statUsed').innerText = usedCount;
+
+        if (entries.length === 0) {
+            list.innerHTML = '<p style="color:var(--text-dim); text-align:center; padding:20px;">Belum ada kode. Generate dulu!</p>';
+            return;
+        }
+
+        list.innerHTML = entries.map(([code, info]) => {
+            const isAvail = info.status === 'available';
+            const statusBadge = isAvail
+                ? '<span class="badge badge-green">✅ Tersedia</span>'
+                : `<span class="badge badge-red">🚫 Terpakai</span>`;
+            const timeInfo = isAvail
+                ? `<span style="font-size:11px; color:var(--text-dim);">Dibuat: ${info.created_str || '-'}</span>`
+                : `<span style="font-size:11px; color:var(--text-dim);">Dipakai: ${info.used_str || '-'}</span>`;
+            return `
+                <div class="code-item">
+                    <div>
+                        <span class="code-text ${isAvail ? 'code-available' : 'code-used'}" onclick="copyCode('${code}')">${code}</span>
+                        <div style="margin-top:4px;">${statusBadge} ${timeInfo}</div>
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="deleteCode('${code}')">🗑️</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function generateCodes() {
+        const count = document.getElementById('codeCount').value;
+        fetch(API_BASE + '/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: adminPw, count: parseInt(count)})
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.codes) {
+                lastNewCodes = d.codes;
+                document.getElementById('newCodes').classList.remove('hidden');
+                document.getElementById('newCodesList').innerText = d.codes.join('\n');
+                toast(`🎫 ${d.codes.length} kode berhasil dibuat!`);
+                refreshCodes();
+            }
+        });
+    }
+
+    function deleteCode(code) {
+        if (!confirm(`Hapus kode ${code}?`)) return;
+        fetch(API_BASE + '/delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: adminPw, code: code})
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) { toast('🗑️ Kode dihapus!'); refreshCodes(); }
+        });
+    }
+
+    function copyCode(code) {
+        navigator.clipboard.writeText(code);
+        toast(`📋 Copied: ${code}`);
+    }
+
+    function copyAllNew() {
+        navigator.clipboard.writeText(lastNewCodes.join('\n'));
+        toast(`📋 ${lastNewCodes.length} kode di-copy!`);
+    }
+
+    function toast(m) {
+        const x = document.createElement('div');
+        x.className = 'toast';
+        x.innerText = m;
+        document.getElementById('tBox').appendChild(x);
+        setTimeout(() => x.remove(), 3000);
+    }
+</script>
+</body>
+</html>

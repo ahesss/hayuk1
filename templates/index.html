@@ -51,7 +51,9 @@
 
 <script>
     (function() {
-        if(localStorage.getItem('herosms_pass')) {
+        // RESET semua session lama
+        localStorage.removeItem('herosms_pass');
+        if(localStorage.getItem('herosms_code')) {
             document.write('<style>#loginScreen { display: none !important; } #mainApp { display: block !important; }</style>');
         }
     })();
@@ -60,9 +62,10 @@
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
         <h1>⚡ HeroSMS MEGA</h1>
-        <p style="margin-bottom:24px; color:var(--text-dim)">Ultra Stable Dashboard v12.0</p>
-        <input type="password" id="passInput" placeholder="Password Akses">
-        <button class="btn btn-primary" style="width:100%" onclick="login()">Buka Dashboard</button>
+        <p style="margin-bottom:24px; color:var(--text-dim)">Masukkan Kode Akses Anda</p>
+        <input type="text" id="passInput" placeholder="Kode Akses (contoh: HERO-XXXX-XXXX)" style="text-transform:uppercase; letter-spacing:2px; font-weight:700; text-align:center;">
+        <button class="btn btn-primary" style="width:100%" onclick="login()">🔓 Buka Dashboard</button>
+        <p style="margin-top:16px; font-size:11px; color:var(--text-dim);">Hubungi admin untuk mendapatkan kode akses</p>
     </div>
 </div>
 
@@ -128,7 +131,7 @@
 
     // Helper: Ambil data tersimpan
     const getStored = () => ({
-        password: localStorage.getItem('herosms_pass'),
+        password: localStorage.getItem('herosms_code'),
         api_key: localStorage.getItem('api_key')
     });
 
@@ -140,8 +143,9 @@
     });
 
     function login() {
-        const p = document.getElementById('passInput').value;
-        localStorage.setItem('herosms_pass', p);
+        const p = document.getElementById('passInput').value.trim().toUpperCase();
+        if(!p) return;
+        localStorage.setItem('herosms_code', p);
         socket.emit('check_auth', {password: p});
     }
 
@@ -153,8 +157,8 @@
             if(k) { document.getElementById('apiInput').value = k; getBal(); }
             loadHistory();
         } else {
-            localStorage.removeItem('herosms_pass');
-            alert('Password Salah!');
+            localStorage.removeItem('herosms_code');
+            alert('Kode Akses tidak valid atau sudah dipakai orang lain!');
             location.reload();
         }
     });

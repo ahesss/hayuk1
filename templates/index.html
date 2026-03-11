@@ -349,8 +349,8 @@
                 </div>
             </div>
             <div class="order-meta">
-                <div class="timer" id="time_${d.id}">02:00</div>
-                <button class="btn btn-ghost" style="padding:4px 10px; font-size:11px; border-color:rgba(239,68,68,0.3); color:var(--red)" onclick="socket.emit('cancel_order', {id:'${d.id}'})">✕ Cancel</button>
+                <div class="timer hidden" id="time_${d.id}">20:00</div>
+                <button id="cancel_${d.id}" class="btn btn-ghost" style="padding:4px 10px; font-size:11px; opacity:0.3; cursor:not-allowed" onclick="if(!this.disabled) socket.emit('cancel_order', {id:'${d.id}'})" disabled>✕ Wait 2m</button>
             </div>
         `;
         list.prepend(card);
@@ -358,7 +358,25 @@
 
     function startTimer(id, st) {
         timers[id] = setInterval(() => {
-            const rem = 120 - (Date.now()/1000 - st);
+            const elTime = (Date.now()/1000 - st);
+            const rem = 1200 - elTime;
+            
+            // Logic Unlock Cancel (2 Menit = 120 Detik)
+            const cancelBtn = document.getElementById(`cancel_${id}`);
+            if(cancelBtn) {
+                if(elTime >= 120) {
+                    cancelBtn.disabled = false;
+                    cancelBtn.style.opacity = '1';
+                    cancelBtn.style.cursor = 'pointer';
+                    cancelBtn.style.color = 'var(--red)';
+                    cancelBtn.style.borderColor = 'rgba(239,68,68,0.3)';
+                    cancelBtn.innerText = '✕ Cancel';
+                } else {
+                    const wait = Math.ceil(120 - elTime);
+                    cancelBtn.innerText = `✕ Wait ${wait}s`;
+                }
+            }
+
             if(rem <= 0) { clearInterval(timers[id]); return; }
             const m = Math.floor(rem/60), s = Math.floor(rem%60);
             const el = document.getElementById(`time_${id}`);

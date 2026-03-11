@@ -297,14 +297,17 @@
     });
 
 
-    // AUTO LOGIN
-    window.onload = () => {
+    // --- LOGIKA AUTO LOGIN INSTAN ---
+    (function() {
         const p = localStorage.getItem('herosms_pass');
         if(p) {
-            document.getElementById('passInput').value = p;
-            setTimeout(login, 500);
+            // Sembunyikan login screen secepat mungkin
+            document.write('<style>#loginScreen { display: none !important; } #mainApp { display: block !important; }</style>');
+            socket.on('connect', () => {
+                socket.emit('login', {password: p});
+            });
         }
-    };
+    })();
 
     function login() { 
         const p = document.getElementById('passInput').value;
@@ -320,6 +323,9 @@
             if(k) { document.getElementById('apiInput').value=k; setKey(); }
             loadHistory(); // Load history setelah login sukses
         } else {
+            // Jika gagal, pastikan layar login muncul kembali
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
             toast('❌ Pass Salah!', 'red');
             localStorage.removeItem('herosms_pass');
         }

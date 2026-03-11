@@ -80,10 +80,11 @@
         <button class="btn btn-primary" id="btnSave" onclick="saveKey()">Simpan Key</button>
     </div>
 
-    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:24px;">
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:24px;">
         <div class="stat-card">Total<br><b id="statT" style="font-size:20px">0</b></div>
         <div class="stat-card" style="color:var(--green)">OTP<br><b id="statO" style="font-size:20px">0</b></div>
         <div class="stat-card" style="color:var(--yellow)">Wait<br><b id="statW" style="font-size:20px">0</b></div>
+        <div class="stat-card" style="color:var(--red)">Cancel<br><b id="statC" style="font-size:20px">0</b></div>
     </div>
 
     <div class="country-grid" id="cGrid"></div>
@@ -107,6 +108,14 @@
     </div>
 
     <div id="oList"></div>
+
+    <div id="cancelSection" class="hidden" style="margin-top:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="font-size:16px; color:var(--red);">🚫 Cancelled / Timeout (<span id="cancelCount">0</span>)</h3>
+            <button class="btn btn-ghost" style="padding:8px 16px; font-size:12px; color:var(--red); border-color:var(--red);" onclick="clearCancelled()">🗑️ Hapus Semua</button>
+        </div>
+        <div id="cancelList"></div>
+    </div>
 </div>
 
 <div class="toast-box" id="tBox"></div>
@@ -115,7 +124,7 @@
     const socket = io({transports:['websocket','polling'], reconnection: true, reconnectionDelay: 1000});
     let sel = 'vietnam';
     let acts = {};
-    let counts = {t:0, o:0, w:0};
+    let counts = {t:0, o:0, w:0, c:0};
 
     // Helper: Ambil data tersimpan
     const getStored = () => ({
@@ -228,9 +237,11 @@
             meta.innerHTML = `<div class="otp-box" onclick="copy('${d.code}')">${d.code}</div>`;
             playBeep();
         } else if(['cancelled','timeout'].includes(d.status)) {
-            if(!card.classList.contains('done')) { counts.w--; updateStats(); card.classList.add('done'); }
+            if(!card.classList.contains('done')) { counts.w--; counts.c++; updateStats(); card.classList.add('done'); }
             meta.innerHTML = `<span style="color:var(--red); font-size:12px; font-weight:900;">${d.status.toUpperCase()}</span>`;
             card.style.opacity = '0.5';
+            // Pindahkan ke daftar cancelled
+            setTimeout(() => moveToCancelled(d.id), 2000);
         }
     }
 
@@ -256,10 +267,37 @@
         }
     }
 
-    function updateStats() { document.getElementById('statT').innerText=counts.t; document.getElementById('statO').innerText=counts.o; document.getElementById('statW').innerText=counts.w; }
+    function updateStats() { document.getElementById('statT').innerText=counts.t; document.getElementById('statO').innerText=counts.o; document.getElementById('statW').innerText=counts.w; document.getElementById('statC').innerText=counts.c; }
     function copy(t) { navigator.clipboard.writeText(t); toast(`📋 Copied: ${t}`); }
     function toast(m) { const x = document.createElement('div'); x.className='toast'; x.innerText=m; document.getElementById('tBox').appendChild(x); setTimeout(()=>x.remove(), 3000); }
     function playBeep() { try { const a=new AudioContext(), o=a.createOscillator(), g=a.createGain(); o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.00001, a.currentTime+1); } catch(e){} }
+
+    function moveToCancelled(id) {
+        const card = document.getElementById(`order_${id}`);
+        if(!card) return;
+        card.remove();
+        document.getElementById('cancelList').prepend(card);
+        document.getElementById('cancelSection').classList.remove('hidden');
+        document.getElementById('cancelCount').innerText = document.getElementById('cancelList').children.length;
+    }
+
+    function clearCancelled() {
+        const cancelList = document.getElementById('cancelList');
+        const ids = [];
+        cancelList.querySelectorAll('.order-card').forEach(c => {
+            const id = c.id.replace('order_', '');
+            ids.push(id);
+            delete acts[id];
+        });
+        cancelList.innerHTML = '';
+        counts.c = 0;
+        counts.t = Math.max(0, counts.t - ids.length);
+        updateStats();
+        saveHistory();
+        document.getElementById('cancelSection').classList.add('hidden');
+        document.getElementById('cancelCount').innerText = '0';
+        toast(`🗑️ ${ids.length} order cancelled dihapus!`);
+    }
 
     const COUNTRIES_LIST = {
         vietnam: {n:'Vietnam', f:'🇻🇳'}, philipina: {n:'Philipina', f:'🇵🇭'}, colombia: {n:'Colombia', f:'🇨🇴'}, mexico: {n:'Mexico', f:'🇲🇽'}, brazil: {n:'Brazil', f:'🇧🇷'}

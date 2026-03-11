@@ -8,7 +8,6 @@ import json
 import string
 import random
 import requests
-import threading
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit, join_room
 
@@ -21,9 +20,8 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 API_BASE = "https://hero-sms.com/stubs/handler_api.php"
 MASTER_PASS = str(os.environ.get("ACCESS_PASSWORD", "admin123")).strip()
 ADMIN_SECRET = str(os.environ.get("ADMIN_SECRET", "panel8899")).strip()
-CODES_FILE = "codes.json"
 
-print(f"\n[BOOT] HERO-SMS WEB V15 (SYNC FIX) ONLINE")
+print(f"\n[BOOT] HERO-SMS WEB V16 (IN-MEMORY CODES) ONLINE")
 print(f"[BOOT] Admin Panel: /admin/{ADMIN_SECRET}")
 sys.stdout.flush()
 
@@ -44,62 +42,12 @@ http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
 
 # =============================================
-# THREAD-SAFE KODE AKSES MANAGER
+# IN-MEMORY CODE STORE (NO FILE!)
+# Ini fix utama - karena Railway punya 2 service
+# yang masing-masing punya filesystem sendiri,
+# kita simpan semuanya di memory instance ini.
 # =============================================
-_codes_lock = threading.Lock()
-
-def load_codes():
-    """Thread-safe load codes dari file."""
-    with _codes_lock:
-        if os.path.exists(CODES_FILE):
-            try:
-                with open(CODES_FILE, 'r') as f:
-                    data = json.load(f)
-                    print(f"[CODES] Loaded {len(data)} codes from {CODES_FILE}")
-                    sys.stdout.flush()
-                    return data
-            except json.JSONDecodeError as e:
-                print(f"[ERROR] codes.json corrupt: {e}")
-                sys.stdout.flush()
-            except Exception as e:
-                print(f"[ERROR] Gagal baca codes.json: {e}")
-                sys.stdout.flush()
-        else:
-            print(f"[CODES] {CODES_FILE} belum ada, return empty dict")
-            sys.stdout.flush()
-        return {}
-
-def save_codes(codes):
-    """Thread-safe save codes ke file."""
-    with _codes_lock:
-        try:
-            # Write to temp file first, then rename (atomic write)
-            tmp_file = CODES_FILE + ".tmp"
-            with open(tmp_file, 'w') as f:
-                json.dump(codes, f, indent=2)
-            # Atomic rename
-            if os.path.exists(CODES_FILE):
-                os.remove(CODES_FILE)
-            os.rename(tmp_file, CODES_FILE)
-            print(f"[CODES] Saved {len(codes)} codes to {CODES_FILE}")
-            sys.stdout.flush()
-            return True
-        except Exception as e:
-            print(f"[ERROR] Gagal simpan codes.json: {e}")
-            sys.stdout.flush()
-            return False
-
-def update_code_status(code, new_status, extra_fields=None):
-    """Thread-safe update status satu kode. Returns True jika berhasil."""
-    codes = load_codes()
-    if code not in codes:
-        return False, "Code not found"
-    codes[code]['status'] = new_status
-    if extra_fields:
-        codes[code].update(extra_fields)
-    if save_codes(codes):
-        return True, "OK"
-    return False, "Save failed"
+access_codes = {}
 
 def generate_code():
     chars = string.ascii_uppercase + string.digits
@@ -110,7 +58,6 @@ def generate_code():
 def api_req(key, action, **kwargs):
     if not key: return "ERR_NO_KEY"
     p = {'api_key': key, 'action': action}
-    # Filter out None values to avoid sending "None" as string
     for k, v in kwargs.items():
         if v is not None:
             p[k] = v
@@ -122,7 +69,7 @@ def api_req(key, action, **kwargs):
         return "ERR_HTTP"
 
 # =============================================
-# LOGIN VIA HTTP (BUKAN SOCKETIO!)
+# LOGIN VIA HTTP
 # =============================================
 @app.route('/')
 def home():
@@ -132,51 +79,38 @@ def home():
 
 @app.route('/login', methods=['POST'])
 def login():
+    global access_codes
     code = request.form.get('code', '').strip().upper()
+    
     print(f"[AUTH] Login attempt: '{code}'")
+    print(f"[AUTH] Codes in memory: {len(access_codes)} | Keys: {list(access_codes.keys())}")
     sys.stdout.flush()
     
-    # SELALU baca fresh dari file - ini fix utama sinkronisasi
-    codes = load_codes()
-    print(f"[AUTH] Fresh load: {len(codes)} codes | Keys: {list(codes.keys())}")
-    sys.stdout.flush()
-    
-    if code not in codes:
-        print(f"[AUTH] ❌ Code '{code}' TIDAK DITEMUKAN di codes.json!")
-        print(f"[AUTH] Available codes: {list(codes.keys())}")
+    if code not in access_codes:
+        print(f"[AUTH] ❌ Code '{code}' TIDAK DITEMUKAN!")
         sys.stdout.flush()
         return jsonify({'success': False, 'error': 'Kode tidak valid'})
     
-    code_info = codes[code]
+    code_info = access_codes[code]
     
     if code_info['status'] == 'available':
-        # Kode baru, tandai sebagai digunakan
-        success, msg = update_code_status(code, 'used', {
-            'used_at': time.time(),
-            'used_str': time.strftime('%Y-%m-%d %H:%M:%S')
-        })
-        if success:
-            session['authenticated'] = True
-            session['access_code'] = code
-            print(f"[AUTH] ✅ Code {code} PERTAMA KALI DIPAKAI - BERHASIL!")
-            sys.stdout.flush()
-            return jsonify({'success': True})
-        else:
-            print(f"[AUTH] ❌ Code {code} gagal disimpan: {msg}")
-            sys.stdout.flush()
-            return jsonify({'success': False, 'error': 'Server error, coba lagi'})
+        access_codes[code]['status'] = 'used'
+        access_codes[code]['used_at'] = time.time()
+        access_codes[code]['used_str'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        session['authenticated'] = True
+        session['access_code'] = code
+        print(f"[AUTH] ✅ Code {code} BERHASIL LOGIN!")
+        sys.stdout.flush()
+        return jsonify({'success': True})
     
     elif code_info['status'] == 'used':
-        # Kode sudah terpakai - izinkan re-login
         session['authenticated'] = True
         session['access_code'] = code
         print(f"[AUTH] ✅ Code {code} RE-LOGIN OK!")
         sys.stdout.flush()
         return jsonify({'success': True})
     
-    print(f"[AUTH] ❌ Code {code} status unknown: {code_info.get('status')}")
-    sys.stdout.flush()
-    return jsonify({'success': False, 'error': 'Kode tidak valid atau sudah dipakai orang lain'})
+    return jsonify({'success': False, 'error': 'Kode tidak valid'})
 
 @app.route('/logout')
 def logout():
@@ -202,70 +136,97 @@ def admin_list_codes():
     pw = request.args.get('pw', '')
     if pw != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
-    # SELALU baca fresh dari file
-    codes = load_codes()
-    print(f"[ADMIN] List codes: {len(codes)} total")
+    print(f"[ADMIN] List codes: {len(access_codes)} total")
     sys.stdout.flush()
-    return jsonify(codes)
+    return jsonify(access_codes)
 
 @app.route(f'/api/admin/{ADMIN_SECRET}/generate', methods=['POST'])
 def admin_generate():
+    global access_codes
     data = request.get_json()
     if not data or data.get('password') != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
     count = min(int(data.get('count', 1)), 50)
     
-    # SELALU baca fresh dari file sebelum generate
-    codes = load_codes()
     new_codes = []
     for _ in range(count):
         code = generate_code()
-        while code in codes:
+        while code in access_codes:
             code = generate_code()
-        codes[code] = {
+        access_codes[code] = {
             'status': 'available',
             'created': time.time(),
             'created_str': time.strftime('%Y-%m-%d %H:%M:%S')
         }
         new_codes.append(code)
     
-    if save_codes(codes):
-        print(f"[ADMIN] ✅ Generated {len(new_codes)} codes. Total: {len(codes)}")
-        sys.stdout.flush()
-        
-        # Verifikasi: baca ulang file untuk memastikan tersimpan
-        verify = load_codes()
-        saved_count = sum(1 for c in new_codes if c in verify)
-        print(f"[ADMIN] ✅ Verifikasi: {saved_count}/{len(new_codes)} kode terkonfirmasi di file")
-        sys.stdout.flush()
-        
-        return jsonify({'codes': new_codes, 'total': len(codes)})
-    else:
-        print(f"[ADMIN] ❌ GAGAL simpan kode!")
-        sys.stdout.flush()
-        return jsonify({'error': 'Failed to save codes'}), 500
+    print(f"[ADMIN] ✅ Generated {len(new_codes)} codes. Total in memory: {len(access_codes)}")
+    print(f"[ADMIN] All codes: {list(access_codes.keys())}")
+    sys.stdout.flush()
+    
+    return jsonify({'codes': new_codes, 'total': len(access_codes)})
 
 @app.route(f'/api/admin/{ADMIN_SECRET}/delete', methods=['POST'])
 def admin_delete():
+    global access_codes
     data = request.get_json()
     if not data or data.get('password') != MASTER_PASS:
         return jsonify({'error': 'unauthorized'}), 401
     code = data.get('code')
-    
-    # SELALU baca fresh dari file
-    codes = load_codes()
-    if code in codes:
-        del codes[code]
-        if save_codes(codes):
-            print(f"[ADMIN] ✅ Deleted code: {code}")
-            sys.stdout.flush()
-            return jsonify({'success': True})
-        else:
-            return jsonify({'error': 'Failed to save'}), 500
+    if code in access_codes:
+        del access_codes[code]
+        return jsonify({'success': True})
     return jsonify({'error': 'not found'}), 404
 
 # =============================================
-# SOCKET EVENTS (TANPA AUTH - auth sudah via HTTP)
+# BULK IMPORT/EXPORT (untuk backup/restore setelah deploy)
+# =============================================
+@app.route(f'/api/admin/{ADMIN_SECRET}/export', methods=['GET'])
+def admin_export():
+    pw = request.args.get('pw', '')
+    if pw != MASTER_PASS:
+        return jsonify({'error': 'unauthorized'}), 401
+    return jsonify({'codes': access_codes, 'exported_at': time.strftime('%Y-%m-%d %H:%M:%S')})
+
+@app.route(f'/api/admin/{ADMIN_SECRET}/import', methods=['POST'])
+def admin_import():
+    global access_codes
+    data = request.get_json()
+    if not data or data.get('password') != MASTER_PASS:
+        return jsonify({'error': 'unauthorized'}), 401
+    codes_data = data.get('codes', {})
+    if codes_data:
+        access_codes.update(codes_data)
+        print(f"[ADMIN] Imported {len(codes_data)} codes. Total: {len(access_codes)}")
+        sys.stdout.flush()
+        return jsonify({'success': True, 'total': len(access_codes)})
+    return jsonify({'error': 'no codes data'}), 400
+
+# =============================================
+# DEBUG
+# =============================================
+@app.route(f'/api/admin/{ADMIN_SECRET}/debug', methods=['GET'])
+def admin_debug():
+    pw = request.args.get('pw', '')
+    if pw != MASTER_PASS:
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    available = sum(1 for c in access_codes.values() if c.get('status') == 'available')
+    used = sum(1 for c in access_codes.values() if c.get('status') == 'used')
+    
+    return jsonify({
+        'storage': 'IN_MEMORY (no file)',
+        'total_codes': len(access_codes),
+        'available': available,
+        'used': used,
+        'codes_list': list(access_codes.keys()),
+        'server_time': time.strftime('%Y-%m-%d %H:%M:%S'),
+        'instance_id': id(access_codes),
+        'pid': os.getpid(),
+    })
+
+# =============================================
+# SOCKET EVENTS
 # =============================================
 @socketio.on('init_session')
 def on_init(data):
@@ -391,34 +352,6 @@ def on_cancel(data):
     key, aid = data.get('api_key'), data.get('id')
     api_req(key, 'setStatus', status='8', id=aid)
     socketio.emit('order_update', {'id': aid, 'status': 'cancelled'}, room=key)
-
-# =============================================
-# DEBUG ENDPOINT - untuk cek sinkronisasi
-# =============================================
-@app.route(f'/api/admin/{ADMIN_SECRET}/debug', methods=['GET'])
-def admin_debug():
-    pw = request.args.get('pw', '')
-    if pw != MASTER_PASS:
-        return jsonify({'error': 'unauthorized'}), 401
-    
-    codes = load_codes()
-    file_exists = os.path.exists(CODES_FILE)
-    file_size = os.path.getsize(CODES_FILE) if file_exists else 0
-    
-    available = sum(1 for c in codes.values() if c.get('status') == 'available')
-    used = sum(1 for c in codes.values() if c.get('status') == 'used')
-    
-    return jsonify({
-        'file_exists': file_exists,
-        'file_size': file_size,
-        'total_codes': len(codes),
-        'available': available,
-        'used': used,
-        'codes_list': list(codes.keys()),
-        'server_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'cwd': os.getcwd(),
-        'codes_file_path': os.path.abspath(CODES_FILE)
-    })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

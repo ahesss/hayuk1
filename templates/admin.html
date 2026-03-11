@@ -49,6 +49,7 @@
         .sync-ok { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
         .sync-error { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
         .sync-loading { background: rgba(99,102,241,0.15); color: var(--accent); border: 1px solid rgba(99,102,241,0.3); }
+        .info-box { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 14px; margin-bottom: 20px; font-size: 13px; color: var(--accent); }
         .debug-box { background: rgba(6,182,212,0.1); border: 1px solid var(--cyan); border-radius: 12px; padding: 16px; margin-top: 16px; font-size: 12px; font-family: 'Courier New', monospace; color: var(--cyan); white-space: pre-wrap; word-break: break-all; }
     </style>
 </head>
@@ -65,11 +66,15 @@
 
 <div id="adminApp" class="container hidden">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-        <h1 style="font-size:22px;">🔐 Admin — Kelola Kode Akses</h1>
+        <h1 style="font-size:22px;">🔐 Admin Panel V16</h1>
         <div style="display:flex; gap:8px; align-items:center;">
             <span id="syncStatus" class="sync-indicator sync-loading">⏳ Loading...</span>
             <button class="btn btn-danger btn-sm" onclick="location.href='/'">← Kembali</button>
         </div>
+    </div>
+
+    <div class="info-box">
+        💡 <b>V16 IN-MEMORY</b> — Kode disimpan di memory server. Generate kode di sini, lalu user login di halaman utama <b>URL yang sama</b>. Kode hilang jika service di-restart.
     </div>
 
     <div class="stats-row">
@@ -142,9 +147,7 @@
                 alert('Password salah!');
             }
         })
-        .catch(e => {
-            alert('Koneksi gagal: ' + e.message);
-        });
+        .catch(e => alert('Koneksi gagal: ' + e.message));
     }
 
     function setSyncStatus(status, text) {
@@ -163,11 +166,10 @@
         .then(codes => {
             allCodes = codes;
             renderCodes(codes);
-            setSyncStatus('ok', '✅ Sinkron (' + Object.keys(codes).length + ' kode)');
+            setSyncStatus('ok', '✅ Memory (' + Object.keys(codes).length + ' kode)');
         })
         .catch(e => {
-            setSyncStatus('error', '❌ Gagal: ' + e.message);
-            toast('❌ Gagal memuat kode: ' + e.message);
+            setSyncStatus('error', '❌ Error: ' + e.message);
         });
     }
 
@@ -213,7 +215,6 @@
         const btn = document.getElementById('btnGenerate');
         btn.disabled = true;
         btn.innerText = '⏳ Generating...';
-        setSyncStatus('loading', '⏳ Generating...');
         
         fetch(API_BASE + '/generate', {
             method: 'POST',
@@ -229,19 +230,11 @@
                 lastNewCodes = d.codes;
                 document.getElementById('newCodes').classList.remove('hidden');
                 document.getElementById('newCodesList').innerText = d.codes.join('\n');
-                toast(`🎫 ${d.codes.length} kode berhasil dibuat! (Total: ${d.total || '?'})`);
-                
-                // Refresh setelah 500ms untuk memastikan sinkron
-                setTimeout(() => refreshCodes(), 500);
-            } else if (d.error) {
-                toast('❌ Error: ' + d.error);
-                setSyncStatus('error', '❌ Gagal generate');
+                toast(`🎫 ${d.codes.length} kode dibuat! Total: ${d.total}`);
+                refreshCodes();
             }
         })
-        .catch(e => {
-            toast('❌ Gagal generate: ' + e.message);
-            setSyncStatus('error', '❌ Error: ' + e.message);
-        })
+        .catch(e => toast('❌ Error: ' + e.message))
         .finally(() => {
             btn.disabled = false;
             btn.innerText = '🎫 Generate!';
@@ -257,10 +250,8 @@
         })
         .then(r => r.json())
         .then(d => {
-            if (d.success) { toast('🗑️ Kode dihapus!'); refreshCodes(); }
-            else toast('❌ Gagal hapus: ' + (d.error || 'Unknown'));
-        })
-        .catch(e => toast('❌ Error: ' + e.message));
+            if (d.success) { toast('🗑️ Dihapus!'); refreshCodes(); }
+        });
     }
 
     function runDebug() {
@@ -268,15 +259,10 @@
         const info = document.getElementById('debugInfo');
         section.classList.remove('hidden');
         info.innerText = 'Loading...';
-        
         fetch(API_BASE + '/debug?pw=' + encodeURIComponent(adminPw))
         .then(r => r.json())
-        .then(d => {
-            info.innerText = JSON.stringify(d, null, 2);
-        })
-        .catch(e => {
-            info.innerText = 'Error: ' + e.message;
-        });
+        .then(d => { info.innerText = JSON.stringify(d, null, 2); })
+        .catch(e => { info.innerText = 'Error: ' + e.message; });
     }
 
     function copyCode(code) {
@@ -297,11 +283,9 @@
         setTimeout(() => x.remove(), 3000);
     }
 
-    // Auto-refresh setiap 10 detik untuk menjaga sinkronisasi
+    // Auto-refresh every 10s
     setInterval(() => {
-        if (!document.getElementById('adminApp').classList.contains('hidden')) {
-            refreshCodes();
-        }
+        if (!document.getElementById('adminApp').classList.contains('hidden')) refreshCodes();
     }, 10000);
 </script>
 </body>

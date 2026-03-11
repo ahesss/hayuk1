@@ -11,14 +11,14 @@ from flask_socketio import SocketIO, emit
 
 # INIT APP
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_super_mega_brutal_v6")
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_super_mega_brutal_v7")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # CONFIG
 API_BASE = "https://hero-sms.com/stubs/handler_api.php"
 ACCESS_PASSWORD = str(os.environ.get("ACCESS_PASSWORD", "admin123")).strip()
 
-print(f"\n[BOOT] HERO-SMS WEB MEGA BRUTAL STARTING...")
+print(f"\n[BOOT] HERO-SMS WEB MEGA BRUTAL V7 STARTING...")
 sys.stdout.flush()
 
 COUNTRIES = {
@@ -35,9 +35,17 @@ def api_req(key, action, **kwargs):
     p = {'api_key': key, 'action': action}
     p.update(kwargs)
     try:
-        r = requests.get(API_BASE, params=p, timeout=12)
-        return r.text.strip()
-    except: return "ERR_HTTP"
+        r = requests.get(API_BASE, params=p, timeout=15)
+        res = r.text.strip()
+        # Logging ke Railway Logs untuk Debug
+        if action == 'getNumber' and 'ACCESS_NUMBER' not in res:
+             print(f"[API] {action} -> {res}")
+             sys.stdout.flush()
+        return res
+    except Exception as e:
+        print(f"[ERR] API Connection Failed: {e}")
+        sys.stdout.flush()
+        return "ERR_HTTP"
 
 def get_price(key, aid, ck):
     try:
@@ -96,6 +104,7 @@ def handle_bal():
 
 def otp_loop(sid, key, aid, st):
     while sid in user_sessions:
+        # 20 Menit Expired
         if (time.time() - st) > 1200:
             api_req(key, 'setStatus', status='8', id=aid)
             socketio.emit('order_update', {'id': aid, 'status': 'timeout'}, room=sid)
@@ -119,9 +128,10 @@ def on_buy(data):
     count = int(data.get('count', 1))
     def run():
         cnt = COUNTRIES[ck]
-        socketio.emit('buy_status', {'message': f"Nembak {count} nomor..."}, room=sid)
+        socketio.emit('buy_status', {'message': f"Sedang nembak {count} nomor..."}, room=sid)
         done = 0
-        for _ in range(count * 5):
+        # Retry limit lebih banyak (count * 20) agar tidak gampang menyerah
+        for _ in range(count * 20):
             if done >= count or sid not in user_sessions: break
             p = {'service': 'wa', 'country': cnt['id']}
             if cnt['max']: p['maxPrice'] = cnt['max']
@@ -134,10 +144,13 @@ def on_buy(data):
                     socketio.emit('new_number', order, room=sid)
                     socketio.start_background_task(otp_loop, sid, key, aid, order['order_time'])
                     done += 1
-                socketio.sleep(0.2)
-            elif 'NO_BALANCE' in res: break
-            socketio.sleep(0.05)
-        socketio.emit('buy_complete', {'count': done}, room=sid)
+                socketio.sleep(0.5)
+            elif 'NO_BALANCE' in res: 
+                socketio.emit('error_msg', {'message': 'Saldo Habis!'})
+                break
+            # Delay antar tembakan diperhalus agar tidak kena ban IP
+            socketio.sleep(0.25)
+        socketio.emit('buy_complete', {'count': done, 'country': cnt['name']}, room=sid)
     socketio.start_background_task(run)
 
 @socketio.on('start_autobuy')
@@ -167,11 +180,14 @@ def on_auto(data):
                     order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': get_price(key, aid, ck), 'country': ck, 'index': found, 'country_code': cnt['code']}
                     socketio.emit('new_number', order, room=sid)
                     socketio.start_background_task(otp_loop, sid, key, aid, order['order_time'])
-                    socketio.sleep(0.4)
-            elif 'NO_BALANCE' in res: break
+                    socketio.sleep(0.5)
+            elif 'NO_BALANCE' in res: 
+                socketio.emit('error_msg', {'message': 'Saldo Habis!'})
+                break
             else:
-                # MEGA BRUTAL DELAY
-                socketio.sleep(0.01)
+                # Kecepatan Brutal yang "Relatif Aman" (0.15s)
+                # Tetap sangat cepat tapi tidak se-ekstrim 0.01 yang rawan blokir IP
+                socketio.sleep(0.15)
         socketio.emit('autobuy_stopped', {'total': found})
     socketio.start_background_task(run)
 
@@ -183,8 +199,10 @@ def on_stop():
 def on_cancel(data):
     sid = request.sid
     if sid in user_sessions and user_sessions[sid]['key']:
-        api_req(user_sessions[sid]['key'], 'setStatus', status='8', id=data.get('id'))
-        socketio.emit('order_update', {'id': data.get('id'), 'status': 'cancelled'}, room=sid)
+        aid = data.get('id')
+        # Kirim status 8 ke API
+        api_req(user_sessions[sid]['key'], 'setStatus', status='8', id=aid)
+        socketio.emit('order_update', {'id': aid, 'status': 'cancelled'}, room=sid)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

@@ -45,7 +45,7 @@ COUNTRIES = {
 autobuy_active = {}
 
 http_session = requests.Session()
-adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)
+adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
 http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
 
@@ -67,7 +67,7 @@ def api_req(key, action, **kwargs):
         if v is not None:
             p[k] = v
     try:
-        r = http_session.get(API_BASE, params=p, timeout=5)
+        r = http_session.get(API_BASE, params=p, timeout=3)
         return r.text.strip()
     except Exception as e:
         print(f"[API_ERR] {action}: {e}")
@@ -370,7 +370,7 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    NUM_WORKERS = 5
+    NUM_WORKERS = 8
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -385,17 +385,17 @@ def on_auto(data):
                         order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': shared['found'], 'country_code': cnt['code']}
                         socketio.emit('new_number', order, room=key)
                         socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
-                    socketio.sleep(0.01)
+                    socketio.sleep(0.005)
                 elif 'NO_BALANCE' in res:
                     autobuy_active[key] = False
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.01)
+                    socketio.sleep(0.005)
                 else:
-                    socketio.sleep(0.01)
+                    socketio.sleep(0.005)
             except:
-                socketio.sleep(0.05)
+                socketio.sleep(0.02)
 
     def run():
         shared = {'att': 0, 'found': 0}

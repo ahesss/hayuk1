@@ -85,6 +85,10 @@
         <div class="stat-box" style="color:var(--green)">Tersedia<br><b id="statAvail" style="font-size:22px;">0</b></div>
         <div class="stat-box" style="color:var(--red)">Terpakai<br><b id="statUsed" style="font-size:22px;">0</b></div>
     </div>
+    
+    <div style="text-align: right; margin-bottom: 20px;">
+        <button class="btn btn-danger btn-sm" onclick="deleteAllUsed()">🗑️ Hapus Semua Kode Terpakai</button>
+    </div>
 
     <div class="card">
         <h3 style="margin-bottom:16px;">🎫 Generate Kode Baru</h3>
@@ -245,6 +249,12 @@
         if (!confirm('Hapus ' + code + '?')) return;
         fetch(API_BASE + '/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: adminPw, code: code}) })
         .then(r => r.json()).then(d => { if (d.success) { toast('🗑️ Dihapus!'); refreshCodes(); } });
+    }
+
+    function deleteAllUsed() {
+        if (!confirm('Hapus SEMUA kode yang terpakai?')) return;
+        fetch(API_BASE + '/delete_used', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: adminPw}) })
+        .then(r => r.json()).then(d => { if (d.success) { toast('🗑️ ' + d.deleted_count + ' kode dihapus!'); refreshCodes(); } });
     }
 
     function resetCode(code) {

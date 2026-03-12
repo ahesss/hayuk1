@@ -377,6 +377,7 @@ def on_auto(data):
             try:
                 res = api_req(key, 'getNumber', service='wa', country=cnt['id'], maxPrice=cnt['max'])
                 shared['att'] += 1
+                att_num = shared['att']
                 if 'ACCESS_NUMBER' in res:
                     parts = res.split(':')
                     if len(parts) >= 3:
@@ -385,16 +386,24 @@ def on_auto(data):
                         order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': shared['found'], 'country_code': cnt['code']}
                         socketio.emit('new_number', order, room=key)
                         socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
+                        socketio.emit('autobuy_log', {'att': att_num, 'type': 'success', 'msg': f'✅ DAPAT! {num}'}, room=key)
                     socketio.sleep(0.005)
                 elif 'NO_BALANCE' in res:
+                    socketio.emit('autobuy_log', {'att': att_num, 'type': 'error', 'msg': '💸 SALDO HABIS!'}, room=key)
                     autobuy_active[key] = False
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
+                    socketio.emit('autobuy_log', {'att': att_num, 'type': 'miss', 'msg': '— Stok kosong'}, room=key)
+                    socketio.sleep(0.005)
+                elif 'ERR_HTTP' in res:
+                    socketio.emit('autobuy_log', {'att': att_num, 'type': 'error', 'msg': '⚠️ Timeout/Error'}, room=key)
                     socketio.sleep(0.005)
                 else:
+                    socketio.emit('autobuy_log', {'att': att_num, 'type': 'other', 'msg': f'❓ {res[:40]}'}, room=key)
                     socketio.sleep(0.005)
-            except:
+            except Exception as e:
+                socketio.emit('autobuy_log', {'att': shared['att'], 'type': 'error', 'msg': f'⚠️ {str(e)[:30]}'}, room=key)
                 socketio.sleep(0.02)
 
     def run():

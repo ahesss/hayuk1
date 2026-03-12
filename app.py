@@ -434,6 +434,104 @@ def on_stop(data):
     key = data.get('api_key')
     if key: autobuy_active[key] = False
 
+@socketio.on('start_sniper')
+def on_start_sniper(data):
+    key, ck = data.get('api_key'), data.get('country')
+    if autobuy_active.get(key): return
+    autobuy_active[key] = 'SNIPER'
+    cnt = COUNTRIES[ck]
+    
+    sniper_state = {'mode': 'SCOUT', 'strike_end': 0, 'att': 0, 'found': 0}
+    NUM_STRIKE_WORKERS = 15
+    
+    def sniper_worker(wid):
+        while autobuy_active.get(key) == 'SNIPER':
+            now = time.time()
+            is_strike = sniper_state['mode'] == 'STRIKE' and now < sniper_state['strike_end']
+            
+            # Jika mode scout dan bukan worker utama (0), tidur dulu
+            if not is_strike and wid != 0:
+                socketio.sleep(0.5)
+                continue
+                
+            try:
+                res = api_req(key, 'getNumber', service='wa', country=cnt['id'], maxPrice=cnt['max'])
+                sniper_state['att'] += 1
+                att_num = sniper_state['att']
+                
+                if 'ACCESS_NUMBER' in res:
+                    # ✅ DAPAT NOMOR! Jika sedang SCOUT, ubah ke STRIKE MODE!
+                    if not is_strike:
+                        sniper_state['mode'] = 'STRIKE'
+                        sniper_state['strike_end'] = time.time() + 15  # 15 detik pembantaian
+                        socketio.emit('autobuy_log', {'att': att_num, 'type': 'other', 'msg': '🎯 TARGET DETECTED! STRIKE MODE (15 Workers)🔥'}, room=key)
+                        
+                    parts = res.split(':')
+                    if len(parts) >= 3:
+                        aid, num = parts[1], parts[2]
+                        sniper_state['found'] += 1
+                        order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': sniper_state['found'], 'country_code': cnt['code']}
+                        socketio.emit('new_number', order, room=key)
+                        socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
+                        socketio.emit('autobuy_log', {'att': att_num, 'type': 'success', 'msg': f'✅ SNIPED! {num}'}, room=key)
+                    socketio.sleep(0.005)
+                    
+                elif 'NO_BALANCE' in res:
+                    socketio.emit('autobuy_log', {'att': att_num, 'type': 'error', 'msg': '💸 SALDO HABIS!'}, room=key)
+                    autobuy_active[key] = False
+                    socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
+                    break
+                    
+                elif 'NO_NUMBERS' in res:
+                    if is_strike:
+                        socketio.emit('autobuy_log', {'att': att_num, 'type': 'miss', 'msg': '— (Strike) Stok kosong'}, room=key)
+                        socketio.sleep(0.005) # Brutal kalau strike
+                    else:
+                        socketio.emit('autobuy_log', {'att': att_num, 'type': 'miss', 'msg': '— (Scout) Sedang mengintai...'}, room=key)
+                        socketio.sleep(1.0) # Santai kalau scout
+                        
+                elif 'ERR_HTTP' in res:
+                    socketio.emit('autobuy_log', {'att': att_num, 'type': 'error', 'msg': '⚠️ Timeout/Error'}, room=key)
+                    socketio.sleep(0.005)
+                else:
+                    socketio.emit('autobuy_log', {'att': att_num, 'type': 'other', 'msg': f'❓ {res[:40]}'}, room=key)
+                    socketio.sleep(0.005)
+            except Exception as e:
+                socketio.emit('autobuy_log', {'att': sniper_state['att'], 'type': 'error', 'msg': f'⚠️ {str(e)[:30]}'}, room=key)
+                socketio.sleep(0.02)
+                
+    def run_sniper():
+        st = time.time()
+        socketio.emit('autobuy_started', {'country_name': cnt['name']}, room=key)
+        socketio.emit('autobuy_log', {'att': 0, 'type': 'other', 'msg': f'🕵️‍♂️ SNIPER SCOUTING {cnt["name"]} (1 Worker santai)...'}, room=key)
+        
+        workers = []
+        for wid in range(NUM_STRIKE_WORKERS):
+            w = socketio.start_background_task(sniper_worker, wid)
+            workers.append(w)
+            
+        while autobuy_active.get(key) == 'SNIPER':
+            el = int(time.time() - st)
+            
+            # Kembalikan ke Scout jika waktu Strike habis
+            if sniper_state['mode'] == 'STRIKE' and time.time() > sniper_state['strike_end']:
+                sniper_state['mode'] = 'SCOUT'
+                socketio.emit('autobuy_log', {'att': sniper_state['att'], 'type': 'other', 'msg': '🕵️‍♂️ Strike 15s selesai. Kembali ke SCOUT MODE.'}, room=key)
+                
+            socketio.emit('autobuy_stats', {
+                'attempts': sniper_state['att'],
+                'found': sniper_state['found'],
+                'elapsed': el,
+                'speed': round(sniper_state['att']/max(el,1), 1)
+            }, room=key)
+            socketio.sleep(0.5)
+            
+        el = int(time.time() - st)
+        socketio.emit('autobuy_stats', {'attempts': sniper_state['att'], 'found': sniper_state['found'], 'elapsed': el, 'speed': round(sniper_state['att']/max(el,1), 1)}, room=key)
+        socketio.emit('autobuy_stopped', {'total': sniper_state['found']}, room=key)
+        
+    socketio.start_background_task(run_sniper)
+
 @socketio.on('cancel_order')
 def on_cancel(data):
     key, aid = data.get('api_key'), data.get('id')

@@ -97,8 +97,11 @@
             <button class="btn btn-ghost" onclick="buy(5)">5</button>
             <button class="btn btn-ghost" onclick="buy(10)">10</button>
         </div>
-        <button class="btn btn-success" id="btnA" onclick="startAB()">🚀 START 100X BRUTAL</button>
-        <button class="btn btn-danger hidden" id="btnS" onclick="stopAB()">🛑 STOP WAR</button>
+        <div id="btnContainer" style="display:flex; gap:10px;">
+            <button class="btn btn-success" id="btnA" onclick="startAB()" style="flex:1;">🚀 BRUTAL</button>
+            <button class="btn btn-cyan" id="btnSniper" onclick="startSniper()" style="flex:1;">🎯 SNIPER</button>
+        </div>
+        <button class="btn btn-danger hidden" id="btnS" onclick="stopAB()" style="width:100%;">🛑 STOP ACTION</button>
         
         <div id="abStats" class="hidden" style="margin-top:15px; padding:15px; background:rgba(6,182,212,0.1); border:1px solid var(--cyan); border-radius:12px; font-weight:700; color:var(--cyan); text-align:center; display:flex; justify-content:space-around;">
             <div><span style="font-size:12px; color:var(--text-dim); display:block;">Attempts</span><span id="abAtt" style="font-size:20px;">0</span></div>
@@ -229,21 +232,22 @@
 
     function buy(n) { socket.emit('buy_number', {...getStored(), country: sel, count: n}); }
     function startAB() { socket.emit('start_autobuy', {...getStored(), country: sel}); }
+    function startSniper() { socket.emit('start_sniper', {...getStored(), country: sel}); }
     function stopAB() { socket.emit('stop_autobuy', getStored()); }
 
     socket.on('autobuy_started', d => {
-        document.getElementById('btnA').classList.add('hidden');
+        document.getElementById('btnContainer').classList.add('hidden');
         document.getElementById('btnS').classList.remove('hidden');
         document.getElementById('abStats').classList.remove('hidden');
         document.getElementById('abLog').classList.remove('hidden');
         document.getElementById('abLogList').innerHTML = '';
-        toast('🔥 War Dimulai!');
+        toast('🔥 Mode Aktif!');
     });
 
     socket.on('autobuy_stopped', () => {
-        document.getElementById('btnA').classList.remove('hidden');
+        document.getElementById('btnContainer').classList.remove('hidden');
         document.getElementById('btnS').classList.add('hidden');
-        toast('🛑 War Berhenti.');
+        toast('🛑 Aksi Berhenti.');
     });
 
     socket.on('autobuy_stats', d => {

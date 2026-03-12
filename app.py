@@ -67,7 +67,7 @@ def api_req(key, action, **kwargs):
         if v is not None:
             p[k] = v
     try:
-        r = http_session.get(API_BASE, params=p, timeout=5)
+        r = http_session.get(API_BASE, params=p, timeout=3.5)
         return r.text.strip()
     except Exception as e:
         print(f"[API_ERR] {action}: {e}")
@@ -387,7 +387,7 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    NUM_WORKERS = 15  # Brutal Fast Setup
+    NUM_WORKERS = 25  # Max Safe Speed Setup
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -409,11 +409,11 @@ def on_auto(data):
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.05) # Jeda super pendek konstan
+                    socketio.sleep(0.02) # Jeda nyaris hilang
                 elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    socketio.sleep(0.1) # Timeout/Error, diam sebentar lalu hajar lagi
+                    socketio.sleep(0.2) # Timeout/Error, rem sedikit agar IP aman
                 else:
-                    socketio.sleep(0.05)
+                    socketio.sleep(0.02)
             except Exception as e:
                 socketio.sleep(0.2)
 

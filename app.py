@@ -15,7 +15,7 @@ from flask_socketio import SocketIO, emit, join_room
 
 # INIT
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_ultimate_v17_secret_key_persistent")
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "herosms_ultimate_v19_secret_key_reset_2026")
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -77,7 +77,11 @@ def is_authenticated():
     """Cek apakah user authenticated via session ATAU persistent cookie."""
     # 1. Cek Flask session dulu
     if session.get('authenticated'):
-        return True
+        code = session.get('access_code')
+        if code in access_codes and access_codes[code].get('status') == 'used':
+            return True
+        else:
+            session.clear()
     
     # 2. Cek persistent cookie (untuk kasus browser ditutup lalu dibuka lagi)
     auth_token = request.cookies.get('hero_token')

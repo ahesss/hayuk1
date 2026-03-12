@@ -271,6 +271,19 @@ def admin_delete():
         return jsonify({'success': True})
     return jsonify({'error': 'not found'}), 404
 
+@app.route(f'/api/admin/{ADMIN_SECRET}/delete_used', methods=['POST'])
+def admin_delete_used():
+    global access_codes
+    data = request.get_json()
+    if not data or data.get('password') != MASTER_PASS:
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    used_keys = [k for k, v in access_codes.items() if v.get('status') == 'used']
+    for k in used_keys:
+        del access_codes[k]
+        
+    return jsonify({'success': True, 'deleted_count': len(used_keys)})
+
 @app.route(f'/api/admin/{ADMIN_SECRET}/reset', methods=['POST'])
 def admin_reset_code():
     global access_codes

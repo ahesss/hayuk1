@@ -99,7 +99,6 @@
         </div>
         <div id="btnContainer" style="display:flex; gap:10px;">
             <button class="btn btn-success" id="btnA" onclick="startAB()" style="flex:1;">🚀 BRUTAL</button>
-            <button class="btn btn-cyan" id="btnSniper" onclick="startSniper()" style="flex:1;">🎯 SNIPER</button>
         </div>
         <button class="btn btn-danger hidden" id="btnS" onclick="stopAB()" style="width:100%;">🛑 STOP ACTION</button>
         
@@ -110,10 +109,7 @@
             <div><span style="font-size:12px; color:var(--text-dim); display:block;">Time</span><span id="abTime" style="font-size:20px;">0</span>s</div>
         </div>
         
-        <div id="abLog" class="hidden" style="margin-top:12px; background:rgba(10,10,30,0.9); border:1px solid rgba(99,102,241,0.15); border-radius:12px; padding:12px; max-height:200px; overflow-y:auto; font-family:'Courier New',monospace; font-size:11px; line-height:1.6;">
-            <div style="color:var(--text-dim); margin-bottom:6px; font-family:Inter,sans-serif; font-weight:700; font-size:12px;">📡 Live Log</div>
-            <div id="abLogList"></div>
-        </div>
+
     </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h3 style="font-size:16px; color:var(--accent);">📋 Antrean (Sedang Menunggu)</h3>
@@ -235,15 +231,12 @@
 
     function buy(n) { socket.emit('buy_number', {...getStored(), country: sel, count: n}); }
     function startAB() { socket.emit('start_autobuy', {...getStored(), country: sel}); }
-    function startSniper() { socket.emit('start_sniper', {...getStored(), country: sel}); }
     function stopAB() { socket.emit('stop_autobuy', getStored()); }
 
     socket.on('autobuy_started', d => {
         document.getElementById('btnContainer').classList.add('hidden');
         document.getElementById('btnS').classList.remove('hidden');
         document.getElementById('abStats').classList.remove('hidden');
-        document.getElementById('abLog').classList.remove('hidden');
-        document.getElementById('abLogList').innerHTML = '';
         toast('🔥 Mode Aktif!');
     });
 
@@ -260,20 +253,7 @@
         document.getElementById('abTime').innerText = d.elapsed;
     });
 
-    socket.on('autobuy_log', d => {
-        const list = document.getElementById('abLogList');
-        const line = document.createElement('div');
-        const colors = {success:'#10b981', miss:'#475569', error:'#ef4444', other:'#f59e0b'};
-        const now = new Date();
-        const ts = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
-        line.style.color = colors[d.type] || '#94a3b8';
-        line.innerText = `[${ts}] #${d.att} ${d.msg}`;
-        list.appendChild(line);
-        // Max 80 baris
-        while(list.children.length > 80) list.removeChild(list.firstChild);
-        // Auto scroll ke bawah
-        list.parentElement.scrollTop = list.parentElement.scrollHeight;
-    });
+
 
     socket.on('new_number', d => {
         if(acts[d.id]) return;

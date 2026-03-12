@@ -115,7 +115,10 @@
             <div id="abLogList"></div>
         </div>
     </div>
-
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="font-size:16px; color:var(--accent);">📋 Antrean (Sedang Menunggu)</h3>
+        <button class="btn btn-ghost" style="padding:8px 16px; font-size:12px; color:var(--yellow); border-color:var(--yellow);" onclick="cancelAllWaiting()">✕ Cancel Semua (>2 Menit)</button>
+    </div>
     <div id="oList"></div>
 
     <div id="cancelSection" class="hidden" style="margin-top:24px;">
@@ -354,6 +357,22 @@
         document.getElementById('cancelList').prepend(card);
         document.getElementById('cancelSection').classList.remove('hidden');
         document.getElementById('cancelCount').innerText = document.getElementById('cancelList').children.length;
+    }
+
+    function cancelAllWaiting() {
+        // Hanya bisa cancel yang umurnya >= 120 detik (aturan API)
+        const ids = Object.values(acts)
+            .filter(d => d.status === 'waiting' && Date.now()/1000 - d.order_time >= 120)
+            .map(d => d.id);
+            
+        if(!ids.length) {
+            toast('❌ Tidak ada order yang bisa dicancel! (Harus tunggu >2 menit)');
+            return;
+        }
+        
+        if(!confirm(`Yakin cancel ${ids.length} nomor aktif?`)) return;
+        toast(`⚠️ Membatalkan ${ids.length} order...`);
+        socket.emit('cancel_all', {...getStored(), ids: ids});
     }
 
     function clearCancelled() {

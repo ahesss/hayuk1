@@ -538,6 +538,16 @@ def on_cancel(data):
     api_req(key, 'setStatus', status='8', id=aid)
     socketio.emit('order_update', {'id': aid, 'status': 'cancelled'}, room=key)
 
+@socketio.on('cancel_all')
+def on_cancel_all(data):
+    key, ids = data.get('api_key'), data.get('ids', [])
+    def run_cancel():
+        for aid in ids:
+            api_req(key, 'setStatus', status='8', id=aid)
+            socketio.emit('order_update', {'id': aid, 'status': 'cancelled'}, room=key)
+            socketio.sleep(0.1) # Jeda sedikit biar gak kena rate limit
+    socketio.start_background_task(run_cancel)
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host='0.0.0.0', port=port)

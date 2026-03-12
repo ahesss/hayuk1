@@ -45,7 +45,7 @@ COUNTRIES = {
 autobuy_active = {}
 
 http_session = requests.Session()
-adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
+adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100)
 http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
 
@@ -387,15 +387,17 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    NUM_WORKERS = 6
+    NUM_WORKERS = 20  # Extreme War Setup
 
     def single_worker(worker_id, shared):
+        no_number_streak = 0
         while autobuy_active.get(key):
             try:
                 res = api_req(key, 'getNumber', service='wa', country=cnt['id'], maxPrice=cnt['max'])
                 shared['att'] += 1
                 att_num = shared['att']
                 if 'ACCESS_NUMBER' in res:
+                    no_number_streak = 0
                     parts = res.split(':')
                     if len(parts) >= 3:
                         aid, num = parts[1], parts[2]
@@ -409,13 +411,20 @@ def on_auto(data):
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.005)
-                elif 'ERR_HTTP' in res:
-                    socketio.sleep(0.005)
+                    no_number_streak += 1
+                    # Jika keseringan kosong, harus rem mendadak biar API ga baper
+                    if no_number_streak > 30:
+                        socketio.sleep(0.5) 
+                    else:
+                        socketio.sleep(0.1) # Aman untuk 20 thread
+                elif 'ERR_HTTP' in res or 'ERROR' in res:
+                    no_number_streak = 0
+                    socketio.sleep(1.0) # Kalau ada limit proxy/API, diam 1 detik
                 else:
-                    socketio.sleep(0.005)
+                    no_number_streak = 0
+                    socketio.sleep(0.2)
             except Exception as e:
-                socketio.sleep(0.02)
+                socketio.sleep(0.5)
 
     def run():
         shared = {'att': 0, 'found': 0}

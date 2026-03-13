@@ -113,7 +113,10 @@
     </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h3 style="font-size:16px; color:var(--accent);">📋 Antrean (Sedang Menunggu)</h3>
-        <button class="btn btn-ghost" style="padding:8px 16px; font-size:12px; color:var(--yellow); border-color:var(--yellow);" onclick="cancelAllWaiting()">✕ Cancel Semua (>2 Menit)</button>
+        <div style="display:flex; gap:8px;">
+            <button class="btn btn-ghost" style="padding:8px 16px; font-size:12px; color:var(--green); border-color:var(--green);" onclick="copyAllNumbers()">📋 Salin Semua Nomer</button>
+            <button class="btn btn-ghost" style="padding:8px 16px; font-size:12px; color:var(--yellow); border-color:var(--yellow);" onclick="cancelAllWaiting()">✕ Cancel >2 Menit</button>
+        </div>
     </div>
     <div id="oList"></div>
 
@@ -293,7 +296,7 @@
         if(!meta || !card) return;
         if(d.status==='got_otp') {
             if(!card.classList.contains('done')) { counts.o++; counts.w--; updateStats(); card.classList.add('done'); }
-            meta.innerHTML = `<div class="otp-box" onclick="copy('${d.code}')">${d.code}</div>`;
+            meta.innerHTML = `<div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;"><div class="otp-box" onclick="copy('${d.code}')">${d.code}</div><button class="btn btn-ghost" style="padding:4px 8px; font-size:11px; color:var(--red); border-color:var(--red);" onclick="deleteSuccess('${d.id}')">🗑️ Hapus</button></div>`;
             playBeep();
         } else if(['cancelled','timeout'].includes(d.status)) {
             if(!card.classList.contains('done')) { counts.w--; counts.c++; updateStats(); card.classList.add('done'); }
@@ -353,6 +356,31 @@
         if(!confirm(`Yakin cancel ${ids.length} nomor aktif?`)) return;
         toast(`⚠️ Membatalkan ${ids.length} order...`);
         socket.emit('cancel_all', {...getStored(), ids: ids});
+    }
+
+    function copyAllNumbers() {
+        const numbers = Object.values(acts)
+            .filter(d => d.status === 'waiting' || d.status === 'got_otp')
+            .map(d => {
+                const cc = d.country_code || '';
+                return d.number.startsWith(cc) ? d.number.slice(cc.length) : d.number;
+            });
+        if(!numbers.length) { toast('❌ Belum ada nomor aktif!'); return; }
+        navigator.clipboard.writeText(numbers.join('\n'));
+        toast(`📋 ${numbers.length} Nomor disalin!`);
+    }
+
+    function deleteSuccess(id) {
+        const card = document.getElementById(`order_${id}`);
+        if(card) card.remove();
+        if(acts[id]) {
+            if(acts[id].status === 'got_otp') counts.o--;
+            delete acts[id];
+            counts.t--;
+            updateStats();
+        }
+        saveHistory();
+        toast('🗑️ Nomor dihapus dari layar!');
     }
 
     function clearCancelled() {

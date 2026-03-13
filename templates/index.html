@@ -361,6 +361,7 @@
     function copyAllNumbers() {
         const numbers = Object.values(acts)
             .filter(d => d.status === 'waiting')
+            .sort((a, b) => b.order_time - a.order_time)
             .map(d => {
                 const cc = d.country_code || '';
                 return d.number.startsWith(cc) ? d.number.slice(cc.length) : d.number;

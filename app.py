@@ -67,10 +67,10 @@ def api_req(key, action, **kwargs):
         if v is not None:
             p[k] = v
     try:
-        r = http_session.get(API_BASE, params=p, timeout=3.0)
+        r = http_session.get(API_BASE, params=p, timeout=1.5)
         return r.text.strip()
     except Exception as e:
-        print(f"[API_ERR] {action}: {e}")
+        # print(f"[API_ERR] {action}: {e}") # Silent error to avoid console lag
         return "ERR_HTTP"
 
 def is_authenticated():
@@ -387,14 +387,13 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    NUM_WORKERS = 80  # Brutal War Setup (Diturunkan Sedikit)
+    NUM_WORKERS = 250  # MAX Brutal War Setup (Super Agresif Tembus Mexico)
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
             try:
                 res = api_req(key, 'getNumber', service='wa', country=cnt['id'], maxPrice=cnt['max'])
                 shared['att'] += 1
-                att_num = shared['att']
                 if 'ACCESS_NUMBER' in res:
                     parts = res.split(':')
                     if len(parts) >= 3:
@@ -403,19 +402,19 @@ def on_auto(data):
                         order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': shared['found'], 'country_code': cnt['code']}
                         socketio.emit('new_number', order, room=key)
                         socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
-                    socketio.sleep(0.003)
+                    socketio.sleep(0.001)
                 elif 'NO_BALANCE' in res:
                     autobuy_active[key] = False
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.005) # Jeda brutal
+                    socketio.sleep(0.001) # Jeda sekecil mungkin
                 elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    socketio.sleep(0.05) # Timeout/Error, rem sedikit agar IP aman
+                    socketio.sleep(0.01) # Error jaringan, tahan dikit biar ga 100% loss
                 else:
-                    socketio.sleep(0.01)
+                    socketio.sleep(0.002)
             except Exception as e:
-                socketio.sleep(0.05)
+                socketio.sleep(0.01)
 
     def run():
         shared = {'att': 0, 'found': 0}

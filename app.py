@@ -67,7 +67,7 @@ def api_req(key, action, **kwargs):
         if v is not None:
             p[k] = v
     try:
-        r = http_session.get(API_BASE, params=p, timeout=2.5)
+        r = http_session.get(API_BASE, params=p, timeout=3.0)
         return r.text.strip()
     except Exception as e:
         print(f"[API_ERR] {action}: {e}")
@@ -387,7 +387,7 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    NUM_WORKERS = 150  # Super Brutal War Setup
+    NUM_WORKERS = 80  # Brutal War Setup (Diturunkan Sedikit)
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -403,19 +403,19 @@ def on_auto(data):
                         order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': shared['found'], 'country_code': cnt['code']}
                         socketio.emit('new_number', order, room=key)
                         socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
-                    socketio.sleep(0.001)
+                    socketio.sleep(0.003)
                 elif 'NO_BALANCE' in res:
                     autobuy_active[key] = False
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.001) # Jeda super brutal
+                    socketio.sleep(0.005) # Jeda brutal
                 elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    socketio.sleep(0.01) # Timeout/Error, rem sedikit agar IP aman
+                    socketio.sleep(0.05) # Timeout/Error, rem sedikit agar IP aman
                 else:
-                    socketio.sleep(0.002)
+                    socketio.sleep(0.01)
             except Exception as e:
-                socketio.sleep(0.01)
+                socketio.sleep(0.05)
 
     def run():
         shared = {'att': 0, 'found': 0}

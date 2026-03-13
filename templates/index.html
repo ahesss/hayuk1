@@ -360,7 +360,7 @@
 
     function copyAllNumbers() {
         const numbers = Object.values(acts)
-            .filter(d => d.status === 'waiting' || d.status === 'got_otp')
+            .filter(d => d.status === 'waiting')
             .map(d => {
                 const cc = d.country_code || '';
                 return d.number.startsWith(cc) ? d.number.slice(cc.length) : d.number;

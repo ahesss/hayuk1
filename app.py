@@ -104,12 +104,14 @@ def api_req(key, action, use_ui_session=False, **kwargs):
     try:
         r = global_session.get(API_BASE, params=p, timeout=timeout)
         return r.text.strip()
-    except:
+    except Exception as e:
+        # Jika error koneksi, beri jeda paksa 1 detik agar tidak spam
+        time.sleep(1)
         # Strategi 2: Fallback ke Direct Request (Slow tapi Gak Akan Kena Pool Error)
         try:
-            r = requests.get(API_BASE, params=p, timeout=10.0)
+            r = requests.get(API_BASE, params=p, timeout=15.0)
             return r.text.strip()
-        except Exception as e:
+        except:
             return f"ERR_HTTP: {str(e)}"
     return "ERR_UNKNOWN_NET_ERROR"
 
@@ -462,9 +464,11 @@ def on_auto(data):
                 elif 'NO_NUMBERS' in res:
                     socketio.sleep(0.01) # Ultra fast
                 elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    socketio.sleep(0.1) 
+                    # COOL DOWN: Jika error koneksi, stop worker ini 5 detik
+                    # Agar tidak memicu IP block/spam
+                    socketio.sleep(5.0) 
                 else:
-                    socketio.sleep(0.01)
+                    socketio.sleep(0.02)
             except:
                 socketio.sleep(0.1)
 

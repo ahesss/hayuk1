@@ -46,25 +46,17 @@ COUNTRIES = {
 
 autobuy_active = {}
 
-# Persistent HTTP Sessions
-# Satu untuk UI/Saldo (Selalu Cepat), Satu untuk Workers (Massal)
-ui_session = requests.Session()
-worker_session = requests.Session()
-
-# Adapter untuk UI: Cepat dan Resilien
-ui_adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=3)
-ui_session.mount('https://', ui_adapter)
-
-# Adapter untuk Workers: Kapasitas Besar
-worker_adapter = requests.adapters.HTTPAdapter(
-    pool_connections=50, 
-    pool_maxsize=100, 
+# Persistent HTTP Session - Satu kolam besar untuk semua (UI + Workers)
+# Kapasitas 500 untuk menangani 35 Hunter + ratusan OTP Worker tanpa antre.
+global_session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(
+    pool_connections=200, 
+    pool_maxsize=500, 
     max_retries=1,
     pool_block=False 
 )
-worker_session.mount('https://', worker_adapter)
-ui_session.headers.update({'Connection': 'keep-alive'})
-worker_session.headers.update({'Connection': 'keep-alive'})
+global_session.mount('https://', adapter)
+global_session.headers.update({'Connection': 'keep-alive', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'})
 
 # =============================================
 # PERSISTENT CODE STORE
@@ -106,14 +98,20 @@ def api_req(key, action, use_ui_session=False, **kwargs):
     p = {'api_key': str(key).strip(), 'action': action}
     p.update(kwargs)
     
-    session_to_use = ui_session if use_ui_session else worker_session
-    timeout = 5.0 if use_ui_session else 3.0
+    timeout = 8.0 if use_ui_session else 4.0
     
+    # Strategi 1: Pakai Session (Cepat karena keep-alive)
     try:
-        r = session_to_use.get(API_BASE, params=p, timeout=timeout)
+        r = global_session.get(API_BASE, params=p, timeout=timeout)
         return r.text.strip()
-    except Exception as e:
-        return f"ERR_HTTP: {str(e)}"
+    except:
+        # Strategi 2: Fallback ke Direct Request (Slow tapi Gak Akan Kena Pool Error)
+        try:
+            r = requests.get(API_BASE, params=p, timeout=10.0)
+            return r.text.strip()
+        except Exception as e:
+            return f"ERR_HTTP: {str(e)}"
+    return "ERR_UNKNOWN_NET_ERROR"
 
 def is_authenticated():
     """Cek apakah user authenticated via session ATAU persistent cookie."""
@@ -440,8 +438,8 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    # 50 Workers - Brutal namun aman untuk eventlet
-    NUM_WORKERS = 50 
+    # 35 Workers - Titik aman paling stabil untuk eventlet + ratusan OTP Task
+    NUM_WORKERS = 35 
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):

@@ -1,6 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
-
 import os
 import sys
 import time
@@ -9,6 +6,7 @@ import string
 import random
 import uuid
 import requests
+import threading
 from datetime import timedelta
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, make_response
 from flask_socketio import SocketIO, emit, join_room
@@ -22,7 +20,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 # Gunakan async_mode='threading' untuk kestabilan tinggi di shared server/cloud
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_timeout=60, ping_interval=25)
 
 # CONFIG
 API_BASE = "https://hero-sms.com/stubs/handler_api.php"
@@ -65,14 +63,14 @@ def generate_code():
 
 def api_req(key, action, **kwargs):
     if not key: return "ERR_NO_KEY"
-    p = {'api_key': key, 'action': action}
+    p = {'api_key': str(key).strip(), 'action': action}
     p.update(kwargs)
     try:
-        # Timeout sedikit dinaikkan ke 2.0s untuk kestabilan
+        # Timeout 2s untuk Brutal speed tapi aman
         r = http_session.get(API_BASE, params=p, timeout=2.0)
         return r.text.strip()
-    except:
-        return "ERR_HTTP"
+    except Exception as e:
+        return f"ERR_HTTP: {str(e)}"
 
 def is_authenticated():
     """Cek apakah user authenticated via session ATAU persistent cookie."""
@@ -329,17 +327,24 @@ def on_init(data):
     key = data.get('api_key')
     if key:
         join_room(key)
-        if autobuy_active.get(key):
-            emit('autobuy_started', {'country_name': 'Berjalan'})
+        # Verifikasi key sekalian
+        res = api_req(key, 'getBalance')
+        if 'ACCESS_BALANCE' in res:
+            emit('balance_update', {'balance': res.split(':')[-1], 'valid': True})
+        else:
+            emit('error_msg', {'message': f"API Key bermasalah: {res[:30]}"})
 
 @socketio.on('get_balance')
 def on_bal(data):
     key = data.get('api_key')
+    if not key:
+        emit('error_msg', {'message': 'API Key belum diisi!'})
+        return
     res = api_req(key, 'getBalance')
     if 'ACCESS_BALANCE' in res:
         emit('balance_update', {'balance': res.split(':')[-1]})
     else:
-        emit('error_msg', {'message': 'API Key bermasalah!'})
+        emit('error_msg', {'message': f"Gagal cek saldo: {res[:30]}"})
 
 def otp_worker(room_key, api_key, aid, st):
     while True:

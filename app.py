@@ -43,20 +43,7 @@ COUNTRIES = {
     "mexico": {"name": "Mexico", "flag": "\U0001f1f2\U0001f1fd", "id": "54", "code": "52", "max": None},
     "brazil": {"name": "Brazil", "flag": "\U0001f1e7\U0001f1f7", "id": "73", "code": "55", "max": "1.50"},
 }
-
 autobuy_active = {}
-
-# Persistent HTTP Session - Satu kolam besar untuk semua (UI + Workers)
-# Kapasitas 500 untuk menangani 35 Hunter + ratusan OTP Worker tanpa antre.
-global_session = requests.Session()
-adapter = requests.adapters.HTTPAdapter(
-    pool_connections=200, 
-    pool_maxsize=500, 
-    max_retries=1,
-    pool_block=False 
-)
-global_session.mount('https://', adapter)
-global_session.headers.update({'Connection': 'keep-alive', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'})
 
 # =============================================
 # PERSISTENT CODE STORE
@@ -95,25 +82,18 @@ def generate_code():
 
 def api_req(key, action, use_ui_session=False, **kwargs):
     if not key: return "ERR_NO_KEY"
-    p = {'api_key': str(key).strip(), 'action': action}
+    # Bersihkan whitespace
+    clean_key = str(key).strip()
+    p = {'api_key': clean_key, 'action': action}
     p.update(kwargs)
     
-    timeout = 8.0 if use_ui_session else 4.0
-    
-    # Strategi 1: Pakai Session (Cepat karena keep-alive)
+    # Pendekatan Simple (Tanpa Global Session)
+    # Ini 100% mencegah HTTPSConnectionPool Error karena koneksi tidak dibagikan & tidak nyangkut
     try:
-        r = global_session.get(API_BASE, params=p, timeout=timeout)
+        r = requests.get(API_BASE, params=p, timeout=10.0)
         return r.text.strip()
     except Exception as e:
-        # Jika error koneksi, beri jeda paksa 1 detik agar tidak spam
-        time.sleep(1)
-        # Strategi 2: Fallback ke Direct Request (Slow tapi Gak Akan Kena Pool Error)
-        try:
-            r = requests.get(API_BASE, params=p, timeout=15.0)
-            return r.text.strip()
-        except:
-            return f"ERR_HTTP: {str(e)}"
-    return "ERR_UNKNOWN_NET_ERROR"
+        return f"ERR_HTTP: {str(e)}"
 
 def is_authenticated():
     """Cek apakah user authenticated via session ATAU persistent cookie."""
@@ -440,8 +420,8 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    # 35 Workers - Titik aman paling stabil untuk eventlet + ratusan OTP Task
-    NUM_WORKERS = 35 
+    # 50 Workers - Mode Aman & Stabil (Kembali ke Settingan Awal)
+    NUM_WORKERS = 50 
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -456,21 +436,17 @@ def on_auto(data):
                         order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': shared['found'], 'country_code': cnt['code']}
                         socketio.emit('new_number', order, room=key)
                         socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
-                    socketio.sleep(0.001)
+                    socketio.sleep(0.1)
                 elif 'NO_BALANCE' in res:
                     autobuy_active[key] = False
-                    socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
+                    socketio.emit('error_msg', {'message': '💸 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.01) # Ultra fast
-                elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    # COOL DOWN: Jika error koneksi, stop worker ini 5 detik
-                    # Agar tidak memicu IP block/spam
-                    socketio.sleep(5.0) 
+                    socketio.sleep(0.1)
                 else:
-                    socketio.sleep(0.02)
+                    socketio.sleep(0.3)
             except:
-                socketio.sleep(0.1)
+                socketio.sleep(0.5)
 
     def run():
         shared = {'att': 0, 'found': 0}

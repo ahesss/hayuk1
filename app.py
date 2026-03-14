@@ -1,6 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
-
 import os
 import sys
 import time
@@ -22,8 +19,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# Gunakan async_mode='eventlet' untuk kestabilan tinggi dengan gunicorn eventlet
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60, ping_interval=25)
+# Gunakan async_mode='threading' untuk kestabilan asli
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_timeout=60, ping_interval=25)
 
 # CONFIG
 API_BASE = "https://hero-sms.com/stubs/handler_api.php"
@@ -82,15 +79,13 @@ def generate_code():
 
 def api_req(key, action, use_ui_session=False, **kwargs):
     if not key: return "ERR_NO_KEY"
-    # Bersihkan whitespace
     clean_key = str(key).strip()
     p = {'api_key': clean_key, 'action': action}
     p.update(kwargs)
     
-    # Pendekatan Simple (Tanpa Global Session)
-    # Ini 100% mencegah HTTPSConnectionPool Error karena koneksi tidak dibagikan & tidak nyangkut
+    # FORCE CONNECTION CLOSE - Ini cara paling ampuh buat stop "Connection Pool Full"
     try:
-        r = requests.get(API_BASE, params=p, timeout=10.0)
+        r = requests.get(API_BASE, params=p, timeout=12.0, headers={'Connection': 'close'})
         return r.text.strip()
     except Exception as e:
         return f"ERR_HTTP: {str(e)}"
@@ -420,8 +415,8 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    # 50 Workers - Mode Aman & Stabil (Kembali ke Settingan Awal)
-    NUM_WORKERS = 50 
+    # 25 Workers - Kembali ke setelan stabil agar tidak kena IP Block
+    NUM_WORKERS = 25 
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -436,17 +431,17 @@ def on_auto(data):
                         order = {'id': aid, 'number': num, 'status': 'waiting', 'order_time': time.time(), 'price': cnt['max'] or "0.00", 'country': ck, 'index': shared['found'], 'country_code': cnt['code']}
                         socketio.emit('new_number', order, room=key)
                         socketio.start_background_task(otp_worker, key, key, aid, order['order_time'])
-                    socketio.sleep(0.1)
+                    socketio.sleep(0.5)
                 elif 'NO_BALANCE' in res:
                     autobuy_active[key] = False
                     socketio.emit('error_msg', {'message': '💸 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.1)
+                    socketio.sleep(0.2)
                 else:
-                    socketio.sleep(0.3)
+                    socketio.sleep(0.5)
             except:
-                socketio.sleep(0.5)
+                socketio.sleep(1.0)
 
     def run():
         shared = {'att': 0, 'found': 0}

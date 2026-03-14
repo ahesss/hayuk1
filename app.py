@@ -45,10 +45,17 @@ autobuy_active = {}
 
 # Persistent HTTP Session
 http_session = requests.Session()
-# Pool size ditingkatkan untuk menangani banyak worker paralel
-adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=200, max_retries=0)
+# Konfigurasi Pool yang lebih stabil: 
+# pool_block=True memaksa worker menunggu koneksi kosong daripada error pool full
+adapter = requests.adapters.HTTPAdapter(
+    pool_connections=50, 
+    pool_maxsize=50, 
+    max_retries=1,
+    pool_block=True 
+)
 http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
+http_session.headers.update({'Connection': 'keep-alive'})
 
 # =============================================
 # IN-MEMORY CODE STORE
@@ -65,12 +72,17 @@ def api_req(key, action, **kwargs):
     if not key: return "ERR_NO_KEY"
     p = {'api_key': str(key).strip(), 'action': action}
     p.update(kwargs)
-    try:
-        # Timeout 2s untuk Brutal speed tapi aman
-        r = http_session.get(API_BASE, params=p, timeout=2.0)
-        return r.text.strip()
-    except Exception as e:
-        return f"ERR_HTTP: {str(e)}"
+    # Retry loop untuk mengatasi HTTPSConnectionPool temporary errors
+    for _ in range(2):
+        try:
+            r = http_session.get(API_BASE, params=p, timeout=3.0)
+            return r.text.strip()
+        except requests.exceptions.ConnectionError:
+            time.sleep(1)
+            continue
+        except Exception as e:
+            return f"ERR_HTTP: {str(e)}"
+    return "ERR_HTTP: Connection Timeout/Pool Full"
 
 def is_authenticated():
     """Cek apakah user authenticated via session ATAU persistent cookie."""
@@ -393,8 +405,8 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    # 65 Workers - Titik temu terbaik antara Brutal vs Stabil
-    NUM_WORKERS = 65 
+    # 45 Workers - Seimbang untuk kestabilan Railway/Cloud tanpa Connection Error
+    NUM_WORKERS = 45 
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -415,13 +427,13 @@ def on_auto(data):
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.04) # Jeda pengaman agar tidak crash CPU
+                    socketio.sleep(0.08) # Jeda pengaman lebih stabil
                 elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    socketio.sleep(0.1) 
+                    socketio.sleep(0.2) 
                 else:
-                    socketio.sleep(0.01)
+                    socketio.sleep(0.02)
             except:
-                socketio.sleep(0.1)
+                socketio.sleep(0.2)
 
     def run():
         shared = {'att': 0, 'found': 0}

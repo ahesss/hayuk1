@@ -43,19 +43,25 @@ COUNTRIES = {
 
 autobuy_active = {}
 
-# Persistent HTTP Session
-http_session = requests.Session()
-# Pool yang sangat besar untuk mendukung 95+ worker paralel tanpa macet
-adapter = requests.adapters.HTTPAdapter(
-    pool_connections=200, 
-    pool_maxsize=300, 
+# Persistent HTTP Sessions
+# Satu untuk UI/Saldo (Selalu Cepat), Satu untuk Workers (Massal)
+ui_session = requests.Session()
+worker_session = requests.Session()
+
+# Adapter untuk UI: Cepat dan Resilien
+ui_adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=3)
+ui_session.mount('https://', ui_adapter)
+
+# Adapter untuk Workers: Kapasitas Besar
+worker_adapter = requests.adapters.HTTPAdapter(
+    pool_connections=50, 
+    pool_maxsize=100, 
     max_retries=1,
     pool_block=False 
 )
-http_session.mount('https://', adapter)
-http_session.mount('http://', adapter)
-http_session.headers.update({'Connection': 'keep-alive'})
-http_session.headers.update({'Connection': 'keep-alive'})
+worker_session.mount('https://', worker_adapter)
+ui_session.headers.update({'Connection': 'keep-alive'})
+worker_session.headers.update({'Connection': 'keep-alive'})
 
 # =============================================
 # IN-MEMORY CODE STORE
@@ -68,21 +74,19 @@ def generate_code():
     part2 = ''.join(random.choices(chars, k=4))
     return f"HERO-{part1}-{part2}"
 
-def api_req(key, action, **kwargs):
+def api_req(key, action, use_ui_session=False, **kwargs):
     if not key: return "ERR_NO_KEY"
     p = {'api_key': str(key).strip(), 'action': action}
     p.update(kwargs)
-    # Retry loop untuk mengatasi HTTPSConnectionPool temporary errors
-    for _ in range(2):
-        try:
-            r = http_session.get(API_BASE, params=p, timeout=3.0)
-            return r.text.strip()
-        except requests.exceptions.ConnectionError:
-            time.sleep(1)
-            continue
-        except Exception as e:
-            return f"ERR_HTTP: {str(e)}"
-    return "ERR_HTTP: Connection Timeout/Pool Full"
+    
+    session_to_use = ui_session if use_ui_session else worker_session
+    timeout = 5.0 if use_ui_session else 3.0
+    
+    try:
+        r = session_to_use.get(API_BASE, params=p, timeout=timeout)
+        return r.text.strip()
+    except Exception as e:
+        return f"ERR_HTTP: {str(e)}"
 
 def is_authenticated():
     """Cek apakah user authenticated via session ATAU persistent cookie."""
@@ -336,27 +340,27 @@ def admin_debug():
 # =============================================
 @socketio.on('init_session')
 def on_init(data):
-    key = data.get('api_key')
+    key = str(data.get('api_key', '')).strip()
     if key:
         join_room(key)
-        # Verifikasi key sekalian
-        res = api_req(key, 'getBalance')
+        # Verifikasi key via UI session (Prioritas)
+        res = api_req(key, 'getBalance', use_ui_session=True)
         if 'ACCESS_BALANCE' in res:
             emit('balance_update', {'balance': res.split(':')[-1], 'valid': True})
         else:
-            emit('error_msg', {'message': f"API Key bermasalah: {res[:30]}"})
+            emit('error_msg', {'message': f"Key Check Error: {res}"})
 
 @socketio.on('get_balance')
 def on_bal(data):
-    key = data.get('api_key')
+    key = str(data.get('api_key', '')).strip()
     if not key:
-        emit('error_msg', {'message': 'API Key belum diisi!'})
+        emit('error_msg', {'message': 'API Key Kosong!'})
         return
-    res = api_req(key, 'getBalance')
+    res = api_req(key, 'getBalance', use_ui_session=True)
     if 'ACCESS_BALANCE' in res:
         emit('balance_update', {'balance': res.split(':')[-1]})
     else:
-        emit('error_msg', {'message': f"Gagal cek saldo: {res[:30]}"})
+        emit('error_msg', {'message': f"Saldo Error: {res[:40]}"})
 
 def otp_worker(room_key, api_key, aid, st):
     while True:
@@ -405,8 +409,8 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    # 95 Workers - Kembali ke mode MEGA BRUTAL
-    NUM_WORKERS = 95 
+    # 40 Workers - Jauh lebih stabil untuk menghindari IP Block/Pool Error
+    NUM_WORKERS = 40 
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -441,8 +445,10 @@ def on_auto(data):
         socketio.emit('autobuy_started', {'country_name': cnt['name']}, room=key)
         workers = []
         for wid in range(NUM_WORKERS):
-            w = socketio.start_background_task(single_worker, wid, shared)
-            workers.append(w)
+            if not autobuy_active.get(key): break
+            socketio.start_background_task(single_worker, wid, shared)
+            # Staggered start: Jeda 0.05 detik antar worker agar tidak banjir koneksi di awal
+            socketio.sleep(0.05) 
         while autobuy_active.get(key):
             el = int(time.time() - st)
             socketio.emit('autobuy_stats', {

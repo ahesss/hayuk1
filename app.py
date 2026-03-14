@@ -21,7 +21,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Gunakan async_mode='threading' untuk kestabilan tinggi di shared server/cloud
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # CONFIG
 API_BASE = "https://hero-sms.com/stubs/handler_api.php"
@@ -44,8 +45,10 @@ COUNTRIES = {
 
 autobuy_active = {}
 
+# Persistent HTTP Session
 http_session = requests.Session()
-adapter = requests.adapters.HTTPAdapter(pool_connections=1000, pool_maxsize=1000, max_retries=0)
+# Pool size ditingkatkan untuk menangani banyak worker paralel
+adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=200, max_retries=0)
 http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
 
@@ -63,14 +66,12 @@ def generate_code():
 def api_req(key, action, **kwargs):
     if not key: return "ERR_NO_KEY"
     p = {'api_key': key, 'action': action}
-    for k, v in kwargs.items():
-        if v is not None:
-            p[k] = v
+    p.update(kwargs)
     try:
-        r = http_session.get(API_BASE, params=p, timeout=1.5)
+        # Timeout sedikit dinaikkan ke 2.0s untuk kestabilan
+        r = http_session.get(API_BASE, params=p, timeout=2.0)
         return r.text.strip()
-    except Exception as e:
-        # print(f"[API_ERR] {action}: {e}") # Silent error to avoid console lag
+    except:
         return "ERR_HTTP"
 
 def is_authenticated():
@@ -387,7 +388,8 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    NUM_WORKERS = 150  # Optimized for performance and responsiveness (Avoiding loop lag)
+    # 65 Workers - Titik temu terbaik antara Brutal vs Stabil
+    NUM_WORKERS = 65 
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -408,13 +410,13 @@ def on_auto(data):
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.01) # Optimized delay to avoid CPU pegging while staying fast
+                    socketio.sleep(0.04) # Jeda pengaman agar tidak crash CPU
                 elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    socketio.sleep(0.05) # Jeda sedikit lebih lama jika error koneksi
+                    socketio.sleep(0.1) 
                 else:
-                    socketio.sleep(0.005)
-            except Exception as e:
-                socketio.sleep(0.05)
+                    socketio.sleep(0.01)
+            except:
+                socketio.sleep(0.1)
 
     def run():
         shared = {'att': 0, 'found': 0}

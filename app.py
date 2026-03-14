@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import sys
 import time
@@ -19,8 +22,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# Gunakan async_mode='threading' untuk kestabilan tinggi di shared server/cloud
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', ping_timeout=60, ping_interval=25)
+# Gunakan async_mode='eventlet' untuk kestabilan tinggi dengan gunicorn eventlet
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60, ping_interval=25)
 
 # CONFIG
 API_BASE = "https://hero-sms.com/stubs/handler_api.php"
@@ -64,15 +67,39 @@ ui_session.headers.update({'Connection': 'keep-alive'})
 worker_session.headers.update({'Connection': 'keep-alive'})
 
 # =============================================
-# IN-MEMORY CODE STORE
+# PERSISTENT CODE STORE
 # =============================================
+CODES_FILE = "codes.json"
 access_codes = {}
+
+def load_codes():
+    global access_codes
+    if os.path.exists(CODES_FILE):
+        try:
+            with open(CODES_FILE, 'r') as f:
+                access_codes = json.load(f)
+            print(f"[BOOT] ✅ Loaded {len(access_codes)} codes from {CODES_FILE}")
+        except:
+            access_codes = {}
+    else:
+        # Default code for admin to get in if lost
+        access_codes = {"HERO-INIT-SAFE": {"status": "available", "created": time.time(), "created_str": "SYSTEM"}}
+
+def save_codes_to_file():
+    try:
+        with open(CODES_FILE, 'w') as f:
+            json.dump(access_codes, f)
+    except:
+        pass
+
+load_codes()
 
 def generate_code():
     chars = string.ascii_uppercase + string.digits
     part1 = ''.join(random.choices(chars, k=4))
     part2 = ''.join(random.choices(chars, k=4))
-    return f"HERO-{part1}-{part2}"
+    code = f"HERO-{part1}-{part2}"
+    return code
 
 def api_req(key, action, use_ui_session=False, **kwargs):
     if not key: return "ERR_NO_KEY"
@@ -178,6 +205,7 @@ def login():
         access_codes[code]['used_at'] = time.time()
         access_codes[code]['used_str'] = time.strftime('%Y-%m-%d %H:%M:%S')
         access_codes[code]['auth_token'] = auth_token
+        save_codes_to_file()
         
         session.permanent = True
         session['authenticated'] = True
@@ -274,6 +302,7 @@ def admin_generate():
         }
         new_codes.append(code)
     
+    save_codes_to_file()
     print(f"[ADMIN] ✅ Generated {len(new_codes)} codes. Total: {len(access_codes)}")
     sys.stdout.flush()
     return jsonify({'codes': new_codes, 'total': len(access_codes)})
@@ -287,6 +316,7 @@ def admin_delete():
     code = data.get('code')
     if code in access_codes:
         del access_codes[code]
+        save_codes_to_file()
         return jsonify({'success': True})
     return jsonify({'error': 'not found'}), 404
 
@@ -315,6 +345,7 @@ def admin_reset_code():
         access_codes[code].pop('used_at', None)
         access_codes[code].pop('used_str', None)
         access_codes[code].pop('auth_token', None)
+        save_codes_to_file()
         return jsonify({'success': True})
     return jsonify({'error': 'not found'}), 404
 
@@ -409,8 +440,8 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    # 40 Workers - Jauh lebih stabil untuk menghindari IP Block/Pool Error
-    NUM_WORKERS = 40 
+    # 50 Workers - Brutal namun aman untuk eventlet
+    NUM_WORKERS = 50 
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):

@@ -387,7 +387,7 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    NUM_WORKERS = 250  # MAX Brutal War Setup (Super Agresif Tembus Mexico)
+    NUM_WORKERS = 150  # Optimized for performance and responsiveness (Avoiding loop lag)
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -408,13 +408,13 @@ def on_auto(data):
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.001) # Jeda sekecil mungkin
+                    socketio.sleep(0.01) # Optimized delay to avoid CPU pegging while staying fast
                 elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    socketio.sleep(0.01) # Error jaringan, tahan dikit biar ga 100% loss
+                    socketio.sleep(0.05) # Jeda sedikit lebih lama jika error koneksi
                 else:
-                    socketio.sleep(0.002)
+                    socketio.sleep(0.005)
             except Exception as e:
-                socketio.sleep(0.01)
+                socketio.sleep(0.05)
 
     def run():
         shared = {'att': 0, 'found': 0}

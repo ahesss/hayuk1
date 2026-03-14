@@ -215,8 +215,16 @@
     const getStored = () => ({ api_key: localStorage.getItem('api_key') });
 
     socket.on('connect', () => {
-        const data = getStored();
-        if(data.api_key) socket.emit('init_session', {api_key: data.api_key});
+        const key = localStorage.getItem('api_key');
+        if(key) {
+            socket.emit('init_session', {api_key: key});
+            getBal();
+        }
+        toast('📡 Terhubung ke Server');
+    });
+
+    socket.on('disconnect', () => {
+        toast('⚠️ Koneksi Terputus, Mencoba Menghubungkan...');
     });
 
     function saveKey() {
@@ -229,8 +237,16 @@
     }
 
     function getBal() { socket.emit('get_balance', getStored()); }
-    socket.on('balance_update', d => document.getElementById('balVal').innerText = d.balance);
-    socket.on('error_msg', d => toast('❌ ' + d.message));
+    socket.on('balance_update', d => {
+        document.getElementById('balVal').innerText = d.balance;
+        if(d.valid) toast('✅ API Key Valid & Terhubung!');
+    });
+    socket.on('error_msg', d => {
+        toast('❌ ' + d.message);
+        if(d.message.includes('API Key')) {
+            document.getElementById('apiInput').style.borderColor = 'var(--red)';
+        }
+    });
 
     function buy(n) { socket.emit('buy_number', {...getStored(), country: sel, count: n}); }
     function startAB() { socket.emit('start_autobuy', {...getStored(), country: sel}); }
@@ -417,7 +433,10 @@
 
     // Auto-load
     const savedKey = localStorage.getItem('api_key');
-    if(savedKey) { document.getElementById('apiInput').value = savedKey; getBal(); }
+    if(savedKey) { 
+        document.getElementById('apiInput').value = savedKey;
+        // socket connect handler will handle the init_session
+    }
     loadHistory();
 {% endif %}
 </script>

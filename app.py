@@ -45,16 +45,16 @@ autobuy_active = {}
 
 # Persistent HTTP Session
 http_session = requests.Session()
-# Konfigurasi Pool yang lebih stabil: 
-# pool_block=True memaksa worker menunggu koneksi kosong daripada error pool full
+# Pool yang sangat besar untuk mendukung 95+ worker paralel tanpa macet
 adapter = requests.adapters.HTTPAdapter(
-    pool_connections=50, 
-    pool_maxsize=50, 
+    pool_connections=200, 
+    pool_maxsize=300, 
     max_retries=1,
-    pool_block=True 
+    pool_block=False 
 )
 http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
+http_session.headers.update({'Connection': 'keep-alive'})
 http_session.headers.update({'Connection': 'keep-alive'})
 
 # =============================================
@@ -405,8 +405,8 @@ def on_auto(data):
     if autobuy_active.get(key): return
     autobuy_active[key] = True
     cnt = COUNTRIES[ck]
-    # 45 Workers - Seimbang untuk kestabilan Railway/Cloud tanpa Connection Error
-    NUM_WORKERS = 45 
+    # 95 Workers - Kembali ke mode MEGA BRUTAL
+    NUM_WORKERS = 95 
 
     def single_worker(worker_id, shared):
         while autobuy_active.get(key):
@@ -427,13 +427,13 @@ def on_auto(data):
                     socketio.emit('error_msg', {'message': '\U0001f4b8 SALDO HABIS!'}, room=key)
                     break
                 elif 'NO_NUMBERS' in res:
-                    socketio.sleep(0.08) # Jeda pengaman lebih stabil
+                    socketio.sleep(0.01) # Ultra fast
                 elif 'ERR_HTTP' in res or 'ERROR' in res:
-                    socketio.sleep(0.2) 
+                    socketio.sleep(0.1) 
                 else:
-                    socketio.sleep(0.02)
+                    socketio.sleep(0.01)
             except:
-                socketio.sleep(0.2)
+                socketio.sleep(0.1)
 
     def run():
         shared = {'att': 0, 'found': 0}
